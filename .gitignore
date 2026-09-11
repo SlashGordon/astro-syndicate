@@ -1,0 +1,15 @@
+.tmp-integration-site/
+node_modules/
+dist/
+.astro/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.astro/
+.agents/
+.claude/
+agent/
+skills-lock.json
+dev-docs/*
