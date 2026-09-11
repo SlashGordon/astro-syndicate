@@ -1,0 +1,45 @@
+# Sample deploy pipeline for a real Astro site using astro-syndicate.
+#
+# This demo depends on the package via `file:..` (it lives in the same repo
+# as the package source), which is why it builds the library first. A real
+# project installing `astro-syndicate` from npm would skip straight to
+# `npm ci` against its own package.json - no `build:lib` step needed.
+#
+# Copy this into your own project's `.github/workflows/`, drop the two
+# `file:..`-only steps, and point the build step at your own site.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `file:..`-only: builds the astro-syndicate package this demo consumes.
+      # Skip these two steps in a real project - `npm ci` there already
+      # pulls a published `astro-syndicate` version straight from npm.
+      - run: npm ci
+      - run: npm run build:lib
+
+      - run: npm install --prefix demo --no-audit --no-fund
+      - run: npm run build --prefix demo
+        env:
+          DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_UPLOAD_PRESET: ${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
+          # Every post syncs as a draft unless this is 'true' - see the
+          # CRITICAL note on DevToProvider before flipping it on a schedule
+          # or anything other than a deliberate, manually triggered deploy.
+          DEVTO_PUBLISHED: 'false'
+
+      # Deploy demo/dist/ wherever your host expects it (Pages, Netlify, a
+      # plain `rsync`, ...) - that part is entirely up to your own setup.

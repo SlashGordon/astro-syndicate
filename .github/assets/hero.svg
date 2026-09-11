@@ -1,0 +1,120 @@
+<svg width="1200" height="400" viewBox="0 0 1200 400" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="astro-syndicate">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0a0705"/>
+      <stop offset="0.55" stop-color="#170b09"/>
+      <stop offset="1" stop-color="#2b0f0c"/>
+    </linearGradient>
+    <radialGradient id="vignette" cx="0.5" cy="0.42" r="0.75">
+      <stop offset="0" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.65"/>
+    </radialGradient>
+    <radialGradient id="spotlight" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(300 30) rotate(90) scale(300 520)">
+      <stop offset="0" stop-color="#ffb454" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#ffb454" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="titleFill" x1="60" y1="150" x2="620" y2="150" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f6e7bf"/>
+      <stop offset="1" stop-color="#d4af37"/>
+    </linearGradient>
+    <linearGradient id="rocketBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4a4a4a"/>
+      <stop offset="1" stop-color="#151515"/>
+    </linearGradient>
+    <linearGradient id="flame" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffe6a8" stop-opacity="0"/>
+      <stop offset="0.55" stop-color="#c23b22"/>
+      <stop offset="1" stop-color="#ffb454"/>
+    </linearGradient>
+    <filter id="soften" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+    <clipPath id="frame">
+      <rect width="1200" height="400" rx="18"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#frame)">
+    <rect width="1200" height="400" fill="url(#bg)"/>
+    <rect width="1200" height="400" fill="url(#spotlight)"/>
+
+    <g stroke="#ffffff" stroke-opacity="0.05" stroke-width="1">
+      <line x1="120" y1="-20" x2="60" y2="80"/>
+      <line x1="260" y1="-20" x2="200" y2="90"/>
+      <line x1="980" y1="-20" x2="930" y2="70"/>
+      <line x1="1100" y1="-20" x2="1040" y2="100"/>
+    </g>
+
+    <path d="M1060 330 C 1080 300 1075 270 1060 250" stroke="#e9e2d0" stroke-opacity="0.12" stroke-width="6" fill="none" stroke-linecap="round" filter="url(#soften)"/>
+    <path d="M1075 335 C 1100 300 1090 260 1068 235" stroke="#e9e2d0" stroke-opacity="0.08" stroke-width="8" fill="none" stroke-linecap="round" filter="url(#soften)"/>
+
+    <g stroke="#d4af37" stroke-opacity="0.22" fill="none">
+      <path d="M745 175 A 210 210 0 0 1 900 60"/>
+      <path d="M745 200 A 260 260 0 0 1 940 210"/>
+      <path d="M745 225 A 210 210 0 0 1 900 340"/>
+    </g>
+    <g stroke="#d4af37" stroke-opacity="0.6" stroke-dasharray="2 7" stroke-linecap="round" fill="none">
+      <path d="M745 175 A 210 210 0 0 1 900 60"/>
+      <path d="M745 200 A 260 260 0 0 1 940 210"/>
+      <path d="M745 225 A 210 210 0 0 1 900 340"/>
+    </g>
+    <g fill="#0a0705" stroke="#d4af37" stroke-opacity="0.5">
+      <circle cx="822" cy="112" r="2.5"/>
+      <circle cx="855" cy="200" r="2.5"/>
+      <circle cx="822" cy="288" r="2.5"/>
+    </g>
+
+    <g>
+      <circle cx="905" cy="58" r="26" fill="#150c08" stroke="#d4af37" stroke-opacity="0.7"/>
+      <text x="905" y="63" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="14" font-weight="700" fill="#f6e7bf">D</text>
+      <text x="945" y="63" font-family="Georgia, 'Times New Roman', serif" font-size="18" font-weight="600" fill="#d4af37">dev.to</text>
+
+      <circle cx="945" cy="210" r="26" fill="#150c08" stroke="#d4af37" stroke-opacity="0.7"/>
+      <text x="945" y="215" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="14" font-weight="700" fill="#f6e7bf">H</text>
+      <text x="985" y="215" font-family="Georgia, 'Times New Roman', serif" font-size="18" font-weight="600" fill="#d4af37" opacity="0.8">Hashnode</text>
+
+      <circle cx="905" cy="342" r="26" fill="#150c08" stroke="#d4af37" stroke-opacity="0.7"/>
+      <text x="905" y="347" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="14" font-weight="700" fill="#f6e7bf">M</text>
+      <text x="945" y="347" font-family="Georgia, 'Times New Roman', serif" font-size="18" font-weight="600" fill="#d4af37" opacity="0.8">Medium</text>
+    </g>
+
+    <g transform="translate(660 260) rotate(-52)">
+      <path d="M0 46 L-15 82 L0 70 L15 82 Z" fill="url(#flame)"/>
+      <path d="M-13 40 L-24 60 L-13 52 Z" fill="#c23b22" opacity="0.85"/>
+      <path d="M13 40 L24 60 L13 52 Z" fill="#c23b22" opacity="0.85"/>
+      <path d="M0 -46 C 15 -46 22 -20 22 6 C 22 24 15 38 0 46 C -15 38 -22 24 -22 6 C -22 -20 -15 -46 0 -46 Z" fill="url(#rocketBody)"/>
+      <path d="M-16 -6 C -30 -2 -34 18 -26 30 L-10 14 Z" fill="#0c0c0c"/>
+      <path d="M16 -6 C 30 -2 34 18 26 30 L10 14 Z" fill="#0c0c0c"/>
+      <circle cx="0" cy="-6" r="9" fill="#0b0a08"/>
+      <circle cx="0" cy="-6" r="6" fill="#e9e2d0"/>
+      <g transform="translate(0 -40)">
+        <ellipse cx="0" cy="8" rx="21" ry="6" fill="#0c0c0c"/>
+        <path d="M-13 8 C -14 -9 14 -9 13 8 C 6 4 -6 4 -13 8 Z" fill="#151515"/>
+        <rect x="-13" y="2" width="26" height="4.5" rx="1.5" fill="#7a1f1f"/>
+      </g>
+    </g>
+
+    <g transform="translate(486 92) rotate(-6)">
+      <circle r="52" fill="#150c08" stroke="#d4af37" stroke-opacity="0.7" stroke-width="2.5"/>
+      <circle r="43" fill="none" stroke="#d4af37" stroke-opacity="0.35" stroke-width="1"/>
+
+      <g transform="translate(0 4)">
+        <ellipse cx="0" cy="15" rx="34" ry="9" fill="#0c0c0c" stroke="#d4af37" stroke-opacity="0.65" stroke-width="1.5"/>
+        <path d="M-22 15 C -24 -18 24 -18 22 15 C 11 8 -11 8 -22 15 Z" fill="#262626" stroke="#d4af37" stroke-opacity="0.65" stroke-width="1.5"/>
+        <rect x="-22" y="4" width="44" height="8" rx="2" fill="#8a2323"/>
+      </g>
+    </g>
+
+    <text x="64" y="150" font-family="Georgia, 'Times New Roman', serif" font-size="56" font-weight="700" letter-spacing="0.5" fill="url(#titleFill)">astro-syndicate</text>
+    <text x="66" y="184" font-family="Georgia, 'Times New Roman', serif" font-size="19" font-style="italic" fill="#c9a86a">"An offer your blog can't refuse."</text>
+    <text x="66" y="222" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, sans-serif" font-size="20" fill="#cdbfa0">The outfit that runs your Markdown/MDX posts to dev.to</text>
+    <text x="66" y="250" font-family="ui-sans-serif, -apple-system, Segoe UI, Roboto, sans-serif" font-size="20" fill="#cdbfa0">(and beyond) - quietly, as part of <tspan font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#d4af37">astro build</tspan>.</text>
+
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14">
+      <rect x="64" y="288" width="248" height="32" rx="6" fill="#150c08" stroke="#d4af37" stroke-opacity="0.4"/>
+      <circle cx="64" cy="304" r="11" fill="#7a1f1f" stroke="#f6e7bf" stroke-opacity="0.4"/>
+      <text x="64" y="309" text-anchor="middle" font-family="Georgia, serif" font-weight="700" font-size="12" fill="#f6e7bf">S</text>
+      <text x="86" y="309" fill="#d4af37">syndicate: true</text>
+    </g>
+  </g>
+</svg>

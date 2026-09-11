@@ -1,0 +1,69 @@
+# Sample "syndicate after deploy" pipeline: build the demo, deploy the
+# static output to Cloudflare Pages, and only THEN sync to dev.to - so every
+# canonical URL and cover image dev.to sees is already live. Cloudflare
+# Pages is just the example host here; swap the deploy step for whatever you
+# actually use (Netlify, Vercel, S3 + CloudFront, ...) and keep the
+# syndicate step as-is.
+#
+# Compare with deploy.yml, which syncs inline during `astro build` instead -
+# see the root README's "Two ways to trigger it" for when to pick which.
+#
+# Needs only DEVTO_API_KEY from deploy.yml's secrets (no Cloudinary ones -
+# see the syndicate step below), plus two Cloudflare secrets:
+#   CLOUDFLARE_API_TOKEN   - "Cloudflare Pages" template token
+#   CLOUDFLARE_ACCOUNT_ID  - shown on the right of any Cloudflare dashboard page
+name: Deploy to Cloudflare Pages, then syndicate
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `file:..`-only: builds the astro-syndicate package this demo consumes.
+      # Skip these two steps in a real project - `npm ci` there already
+      # pulls a published `astro-syndicate` version straight from npm.
+      - run: npm ci
+      - run: npm run build:lib
+
+      - run: npm install --prefix demo --no-audit --no-fund
+
+      # No DEVTO_API_KEY here on purpose: `syndication.config.ts`'s `enabled`
+      # gate is `Boolean(process.env.DEVTO_API_KEY)`, so without it this
+      # build only produces static pages - no syndication happens until the
+      # dedicated step below, after Cloudflare confirms the deploy.
+      - run: npm run build --prefix demo
+
+      - name: Deploy to Cloudflare Pages
+        id: deploy
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: astro-syndicate-demo
+          directory: demo/dist
+
+      - name: Visualize the deploy
+        run: echo "### 🚀 Deployed to ${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Syndicate to dev.to
+        run: npm run syndicate --prefix demo
+        env:
+          DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
+          # No Cloudinary secrets here: scripts/syndicate.ts uses
+          # SiteUrlUploader instead of CloudinaryUploader, since the site is
+          # already live on Cloudflare Pages by this point - no upload step
+          # (or Cloudinary account) needed.
+          #
+          # Every post syncs as a draft unless this is 'true' - see the
+          # CRITICAL note on DevToProvider before flipping it on.
+          DEVTO_PUBLISHED: 'false'

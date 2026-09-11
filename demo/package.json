@@ -1,0 +1,22 @@
+{
+  "name": "astro-syndicate-demo",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "syndicate": "tsx scripts/syndicate.ts"
+  },
+  "dependencies": {
+    "astro": "^7.3.2",
+    "astro-syndicate": "file:.."
+  },
+  "devDependencies": {
+    "tsx": "^4.23.13"
+  }
+}

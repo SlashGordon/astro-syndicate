@@ -1,0 +1,56 @@
+# Sample "syndicate after deploy" pipeline for Gitea Actions - see
+# ../../.github/workflows/cloudflare-pages.yml for the GitHub Actions version
+# and the full explanation of what each step does and why.
+#
+# Deploys via the Wrangler CLI directly rather than a marketplace action: a
+# plain `run:` step works the same on any runner, without depending on a
+# composite/JS action resolving from github.com (see the note on that in
+# ../workflows/deploy.yml).
+#
+# Needs only DEVTO_API_KEY from deploy.yml's secrets (no Cloudinary ones -
+# see the syndicate step below), plus two Cloudflare secrets (Settings >
+# Actions > Secrets): CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
+name: Deploy to Cloudflare Pages, then syndicate
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # `file:..`-only, see deploy.yml. Skip in a real project.
+      - run: npm ci
+      - run: npm run build:lib
+
+      - run: npm install --prefix demo --no-audit --no-fund
+
+      # No DEVTO_API_KEY here on purpose - see the GitHub Actions version's
+      # comment on the equivalent step.
+      - run: npm run build --prefix demo
+
+      - name: Deploy to Cloudflare Pages
+        run: npx wrangler pages deploy demo/dist --project-name=astro-syndicate-demo
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        # Wrangler prints the live *.pages.dev URL straight to this step's
+        # log - that's the deploy "visualized" without parsing its output.
+
+      - name: Syndicate to dev.to
+        run: npm run syndicate --prefix demo
+        env:
+          DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
+          # No Cloudinary secrets here - see the GitHub Actions version's
+          # comment on the equivalent step.
+          #
+          # Every post syncs as a draft unless this is 'true' - see the
+          # CRITICAL note on DevToProvider before flipping it on.
+          DEVTO_PUBLISHED: 'false'

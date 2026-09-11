@@ -1,0 +1,42 @@
+---
+title: A Local-First Image Pipeline for dev.to
+slug: local-first-image-pipeline
+syndicate: true
+coverImage: /covers/mdx-post-cover.png
+description: >-
+  Why we upload images ourselves instead of relying on a platform's own upload
+  API.
+series: Building astro-syndicate
+tags:
+  - images
+  - devto
+  - mdx
+---
+
+dev.to has no public image-upload endpoint, so this integration resolves
+local images to public URLs itself before a post goes out.
+
+## The same image, twice
+
+Referencing the same file twice only costs one upload - the second
+occurrence is served from the pipeline's own cache:
+
+![architecture diagram, reused from the other post](/images/architecture.png)
+
+<img src="/images/architecture.png" alt="same file again, still one upload" />
+
+## MDX-flavored content survives untouched
+
+This file is `.mdx`, so it can hold JSX-like markup such as
+<Badge>experimental</Badge> or an expression like <code>{'{2 + 2}'}</code>.
+None of that confuses the syndication integration - it reads this file as
+plain text via `gray-matter`, the same way it reads a `.md` file.
+
+{/* an MDX comment, also just plain text as far as syndication is concerned */}
+
+## A second image
+
+![screenshot of a passing test run](/images/screenshot.png)
+
+Run the demo build twice: the first run creates both posts on dev.to, the
+second run should report both as unmodified and make zero API calls.

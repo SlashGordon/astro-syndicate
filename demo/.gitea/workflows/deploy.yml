@@ -1,0 +1,46 @@
+# Sample deploy pipeline for a real Astro site using astro-syndicate, for a
+# self-hosted Gitea instance with Actions enabled (Settings > Actions).
+#
+# Gitea Actions runs the same workflow syntax as GitHub Actions, so this file
+# is nearly identical to ../.github/workflows/deploy.yml - see that one for
+# what each step does. `actions/checkout@v4` and `actions/setup-node@v4`
+# resolve straight from github.com by default (`DEFAULT_ACTIONS_URL` in
+# app.ini); if your instance has that locked down, point these `uses:` lines
+# at Gitea's own mirrors instead, e.g. https://gitea.com/actions/checkout@v4.
+#
+# This demo depends on the package via `file:..` (it lives in the same repo
+# as the package source), hence the extra build step. A real project
+# installing `astro-syndicate` from npm would skip straight to `npm ci`.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # `file:..`-only: builds the astro-syndicate package this demo consumes.
+      # Skip these two steps in a real project.
+      - run: npm ci
+      - run: npm run build:lib
+
+      - run: npm install --prefix demo --no-audit --no-fund
+      - run: npm run build --prefix demo
+        env:
+          DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_UPLOAD_PRESET: ${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
+          # Every post syncs as a draft unless this is 'true' - see the
+          # CRITICAL note on DevToProvider before flipping it on a schedule
+          # or anything other than a deliberate, manually triggered deploy.
+          DEVTO_PUBLISHED: 'false'
+
+      # Deploy demo/dist/ wherever your host expects it.
