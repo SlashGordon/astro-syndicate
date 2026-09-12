@@ -7,14 +7,26 @@
 #
 # Copy this into your own project's `.github/workflows/`, drop the two
 # `file:..`-only steps, and point the build step at your own site.
+#
+# `astro build` here also runs syndication (via the `syndication()`
+# integration in astro.config.mjs), which rewrites synced posts' frontmatter
+# on disk - see the README's "Persisting sync state in CI" for why the last
+# step below has to commit and push that, and why the job needs
+# `permissions: contents: write` to do it.
 name: Deploy
 
 on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   deploy:
+    # The "Commit updated syndication state" step below pushes back to main,
+    # which would otherwise re-trigger this same workflow on its own commit.
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,3 +55,17 @@ jobs:
 
       # Deploy demo/dist/ wherever your host expects it (Pages, Netlify, a
       # plain `rsync`, ...) - that part is entirely up to your own setup.
+
+      # Without this, every deploy re-creates every post - see the README's
+      # "Persisting sync state in CI".
+      - name: Commit updated syndication state
+        run: |
+          if git diff --quiet -- demo/src/content/blog; then
+            echo "nothing to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add demo/src/content/blog
+          git commit -m "chore(sync): update dev.to sync state [skip ci]"
+          git push

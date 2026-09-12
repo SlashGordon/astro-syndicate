@@ -35,6 +35,33 @@ Every new post syncs as a draft on dev.to (`published: false`) by default - noth
 
 Both read the exact same `syndicationOptions` from `syndication.config.ts`, so there's one place to configure either way. Running both isn't harmful (the content-hash skip makes a redundant pass a no-op) - just redundant.
 
+### Persisting sync state in CI
+
+Step 4 above rewrites `deployments` into the post's frontmatter *on disk* - that's how the next run knows a post already exists and only needs an update, not a fresh `POST`. In CI, "on disk" means the runner's checkout, which is thrown away the moment the job ends. Nothing about `runSyndication()` commits that change back to your repo on its own.
+
+Skip this and every single run - during the build or as its own step, doesn't matter which - starts from the same unsynced frontmatter your repo has committed, sees no `deployments.devto` for any post, and creates a brand new dev.to article for every one of them. Again. On every deploy. `DevToProvider` never checks dev.to for an existing article by title or canonical URL first; the local `deployments` block is the only record it trusts.
+
+So a CI-driven setup needs one more step after syndication runs: commit whatever `runSyndication()` changed, and push it back to the branch the workflow runs on.
+
+```yaml
+- name: Commit updated syndication state
+  run: |
+    if git diff --quiet -- src/content/blog; then
+      echo "nothing to commit"
+      exit 0
+    fi
+    git config user.name "github-actions[bot]"
+    git config user.email "github-actions[bot]@users.noreply.github.com"
+    git add src/content/blog
+    git commit -m "chore(sync): update dev.to sync state [skip ci]"
+    git push
+```
+
+Two things that step relies on:
+
+- **Write access to push.** On GitHub, add `permissions: contents: write` to the job and `actions/checkout@v4`'s default credential works as-is. On a self-hosted Gitea instance, the equivalent auto-token isn't reliably available depending on how the instance is configured - a Personal Access Token stored as a secret is the more dependable option there. Either way, see `demo/.github/workflows/cloudflare-pages.yml` / `demo/.gitea/workflows/cloudflare-pages.yml` for a complete, working example of each.
+- **A guard against re-triggering itself.** That commit is a new push to the same branch, which re-fires a workflow that also triggers on push - add `if: "!contains(github.event.head_commit.message, '[skip ci]')"` at the job level (matching the `[skip ci]` marker in the commit message above) so the resulting run is a no-op instead of a second, redundant deploy.
+
 ### Only run in production
 
 `syndicationOptions.enabled` gates the whole run - the current config sets it to `process.env.NODE_ENV === 'production'`, so a local `astro build`, a PR preview, or plain CI never syndicates anything. Match the check to your host (Netlify: `CONTEXT`, Vercel: `VERCEL_ENV`, ...) rather than assuming `NODE_ENV`.

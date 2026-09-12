@@ -10,6 +10,14 @@
 # Needs only DEVTO_API_KEY from deploy.yml's secrets (no Cloudinary ones -
 # see the syndicate step below), plus two Cloudflare secrets (Settings >
 # Actions > Secrets): CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
+#
+# Also needs GIT_PUSH_TOKEN (Settings > Actions > Secrets): a Personal Access
+# Token with write access to this repo (Settings > Applications on your
+# Gitea profile). Gitea Actions' own auto-token isn't reliably available for
+# pushing depending on how the instance is configured, unlike GitHub's - see
+# the README's "Persisting sync state in CI" for why the last step needs to
+# push at all, and the GitHub Actions version of this file for the
+# `permissions: contents: write` equivalent that works there instead.
 name: Deploy to Cloudflare Pages, then syndicate
 
 on:
@@ -18,6 +26,9 @@ on:
 
 jobs:
   deploy:
+    # The "Commit updated syndication state" step below pushes back to main,
+    # which would otherwise re-trigger this same workflow on its own commit.
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,3 +65,26 @@ jobs:
           # Every post syncs as a draft unless this is 'true' - see the
           # CRITICAL note on DevToProvider before flipping it on.
           DEVTO_PUBLISHED: 'false'
+
+      # Without this, every deploy re-creates every post - see the README's
+      # "Persisting sync state in CI". Rewrites whatever credentials
+      # `actions/checkout@v4` set on origin rather than hard-coding this
+      # repo's host/path, so this step works unmodified on any Gitea repo.
+      - name: Commit updated syndication state
+        run: |
+          if git diff --quiet -- demo/src/content/blog; then
+            echo "nothing to commit"
+            exit 0
+          fi
+          if [ -z "$GIT_PUSH_TOKEN" ]; then
+            echo "::error::GIT_PUSH_TOKEN secret is not set - cannot push the syndication commit"
+            exit 1
+          fi
+          git config user.name "gitea-actions"
+          git config user.email "gitea-actions@users.noreply.gitea.io"
+          git add demo/src/content/blog
+          git commit -m "chore(sync): update dev.to sync state [skip ci]"
+          auth_url=$(git remote get-url origin | sed -E "s#https://#https://${GIT_PUSH_TOKEN}@#")
+          git push "$auth_url" HEAD:main
+        env:
+          GIT_PUSH_TOKEN: ${{ secrets.GIT_PUSH_TOKEN }}

@@ -11,6 +11,13 @@
 # This demo depends on the package via `file:..` (it lives in the same repo
 # as the package source), hence the extra build step. A real project
 # installing `astro-syndicate` from npm would skip straight to `npm ci`.
+#
+# `astro build` here also runs syndication (via the `syndication()`
+# integration in astro.config.mjs), which rewrites synced posts' frontmatter
+# on disk - see the README's "Persisting sync state in CI" for why the last
+# step below has to commit and push that, and why it needs GIT_PUSH_TOKEN
+# (Settings > Actions > Secrets: a Personal Access Token with write access,
+# from Settings > Applications on your Gitea profile).
 name: Deploy
 
 on:
@@ -19,6 +26,9 @@ on:
 
 jobs:
   deploy:
+    # The "Commit updated syndication state" step below pushes back to main,
+    # which would otherwise re-trigger this same workflow on its own commit.
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,3 +54,26 @@ jobs:
           DEVTO_PUBLISHED: 'false'
 
       # Deploy demo/dist/ wherever your host expects it.
+
+      # Without this, every deploy re-creates every post - see the README's
+      # "Persisting sync state in CI". Rewrites whatever credentials
+      # `actions/checkout@v4` set on origin rather than hard-coding this
+      # repo's host/path, so this step works unmodified on any Gitea repo.
+      - name: Commit updated syndication state
+        run: |
+          if git diff --quiet -- demo/src/content/blog; then
+            echo "nothing to commit"
+            exit 0
+          fi
+          if [ -z "$GIT_PUSH_TOKEN" ]; then
+            echo "::error::GIT_PUSH_TOKEN secret is not set - cannot push the syndication commit"
+            exit 1
+          fi
+          git config user.name "gitea-actions"
+          git config user.email "gitea-actions@users.noreply.gitea.io"
+          git add demo/src/content/blog
+          git commit -m "chore(sync): update dev.to sync state [skip ci]"
+          auth_url=$(git remote get-url origin | sed -E "s#https://#https://${GIT_PUSH_TOKEN}@#")
+          git push "$auth_url" HEAD:main
+        env:
+          GIT_PUSH_TOKEN: ${{ secrets.GIT_PUSH_TOKEN }}
