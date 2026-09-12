@@ -7,6 +7,8 @@ import { AssetPipeline, findImageRefs, isRemoteRef } from './assets.js';
 import { appendBacklink, type BacklinkOption } from './backlink.js';
 import { normalizeTags, normalizeText } from './frontmatter.js';
 import { generateContentHash } from './hashing.js';
+import type { FolderImage } from './mdx-jsx.js';
+import { resolveMdxImages } from './mdx-jsx.js';
 import { collectMarkdownFiles, resolveCanonicalUrl } from './resolve.js';
 import type {
   AssetUploader,
@@ -66,6 +68,20 @@ export interface SyndicationOptions {
   /** Frontmatter key holding the cover-image path. Defaults to `coverImage`. */
   coverImageField?: string;
   /**
+   * Resolves a folder-driven gallery component's `folderPath="..."` prop (any
+   * capitalised JSX component using that convention - astro-gallery's
+   * `MapGallery`/`ImageTimeline`/etc. included) to the images it renders at
+   * build time. That list isn't written anywhere in the MDX source, only the
+   * integration owning the convention knows it, so without this hook such a
+   * component is stripped from the body sent to a provider and a warning is
+   * logged, rather than guessed at. See the README for a `fast-glob`-based
+   * example.
+   */
+  resolveFolderImages?: (
+    folderPath: string,
+    ctx: { postDir: string },
+  ) => FolderImage[] | Promise<FolderImage[]>;
+  /**
    * Visible "originally published at" line appended to the body sent to
    * every provider - `canonical_url` is metadata, most platforms don't
    * render it as a link for readers. Pass a function for custom text/format,
@@ -108,6 +124,7 @@ export async function runSyndication(options: RunSyndicationOptions): Promise<Ru
     enabled = true,
     assetUploader,
     coverImageField = 'coverImage',
+    resolveFolderImages,
     backlink,
     getCanonicalUrl,
     logger = console,
@@ -192,6 +209,18 @@ export async function runSyndication(options: RunSyndicationOptions): Promise<Ru
     let coverImageUrl: string | undefined;
     let assetFingerprints: string[] = [];
 
+    // .mdx only: a plain .md file cannot contain JSX in the first place.
+    // Turns `<Image src={imported} />` and similar gallery-component syntax
+    // back into plain `![alt](src)` Markdown, and drops the `import` lines
+    // that fed them, before the regular image pipeline below ever runs.
+    if (extname(filePath).toLowerCase() === '.mdx') {
+      body = await resolveMdxImages(body, {
+        postDir: dirname(filePath),
+        resolveFolderImages,
+        log: (message) => logger.info(`${rel} [mdx]: ${message}`),
+      });
+    }
+
     const coverRef =
       typeof data[coverImageField] === 'string' ? (data[coverImageField] as string) : undefined;
 
@@ -216,7 +245,7 @@ export async function runSyndication(options: RunSyndicationOptions): Promise<Ru
       });
 
       try {
-        body = await pipeline.rewriteMarkdown(parsed.content);
+        body = await pipeline.rewriteMarkdown(body);
 
         if (coverRef && !isRemoteRef(coverRef)) {
           const resolved = await pipeline.resolve(coverRef);
@@ -238,7 +267,7 @@ export async function runSyndication(options: RunSyndicationOptions): Promise<Ru
         deployments.assets = pipeline.assetMap;
         frontmatterDirty = true;
       }
-    } else if (findImageRefs(parsed.content).some((ref) => !isRemoteRef(ref))) {
+    } else if (findImageRefs(body).some((ref) => !isRemoteRef(ref))) {
       logger.warn(
         `${rel}: references local images but no assetUploader is configured - ` +
           'they will not resolve on remote platforms',

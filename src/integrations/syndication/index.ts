@@ -42,6 +42,8 @@ export function syndication(options: SyndicationOptions): AstroIntegration {
 export { runSyndication } from './run.js';
 export type { SyndicationOptions, RunSyndicationOptions, RunSyndicationResult, SyndicationLogger } from './run.js';
 export { resolveCanonicalUrl, collectMarkdownFiles } from './resolve.js';
+export { resolveMdxImages } from './mdx-jsx.js';
+export type { FolderImage, ResolveMdxImagesOptions } from './mdx-jsx.js';
 export { appendBacklink } from './backlink.js';
 export type { BacklinkOption, BacklinkFormatter, BacklinkPost } from './backlink.js';
 export { clearDeployments, resetContentDir } from './reset.js';

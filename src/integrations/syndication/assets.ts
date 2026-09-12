@@ -15,6 +15,9 @@ const MIME_BY_EXT: Record<string, string> = {
   '.svg': 'image/svg+xml',
 };
 
+/** Recognised image extensions, exported so `mdx-jsx.ts` can tell an image import from a component import. */
+export const IMAGE_EXTENSIONS = new Set(Object.keys(MIME_BY_EXT));
+
 // --- Markdown / HTML image detection ------------------------------------
 //
 // This is a best-effort scanner, not a full Markdown parser. It reliably
@@ -43,8 +46,12 @@ function stripAngles(value: string): string {
   return value.startsWith('<') && value.endsWith('>') ? value.slice(1, -1) : value;
 }
 
-/** Byte ranges to treat as opaque: fenced code blocks and inline code spans. */
-function codeRanges(markdown: string): Array<[number, number]> {
+/**
+ * Byte ranges to treat as opaque: fenced code blocks and inline code spans.
+ * Exported for `mdx-jsx.ts`, which needs the same "don't touch code examples"
+ * masking for its own import/JSX rewrites.
+ */
+export function codeRanges(markdown: string): Array<[number, number]> {
   const ranges: Array<[number, number]> = [];
   for (const match of markdown.matchAll(FENCED_CODE_BLOCK)) {
     ranges.push([match.index, match.index + match[0].length]);
@@ -55,7 +62,7 @@ function codeRanges(markdown: string): Array<[number, number]> {
   return ranges;
 }
 
-function isMasked(index: number, ranges: Array<[number, number]>): boolean {
+export function isMasked(index: number, ranges: Array<[number, number]>): boolean {
   return ranges.some(([start, end]) => index >= start && index < end);
 }
 

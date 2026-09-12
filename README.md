@@ -53,6 +53,35 @@ Both read the exact same `syndicationOptions` from `syndication.config.ts`, so t
 | `tags` | no | Array or comma-separated string. dev.to allows at most 4; extra tags are dropped and the build log says so. |
 | `deployments` | managed | Written by the integration - don't hand-edit it. |
 
+### MDX posts with Astro-native images
+
+A `.mdx` post commonly pulls images in through JavaScript rather than a plain `![alt](src)` string - `astro:assets`' own `<Image src={imported} />`, or a gallery component's `images={[{ src, alt }]}` array. Sent to a provider as-is, none of that resolves: dev.to doesn't run your build, so it just sees the literal `import ...` lines and an empty custom tag.
+
+Before the regular image pipeline runs, the integration rewrites the patterns below back into plain Markdown so they go through it exactly like a hand-written `![alt](src)` would:
+
+- `import name from './local/image.jpg'` - the import line is removed; `name` becomes resolvable everywhere below.
+- `<Image src={name} alt="..." />` (`astro:assets`) → `![alt](./local/image.jpg)`.
+- `<AnyComponent images={[{ src: name, alt: "..." }, ...]} />` (any capitalised component, e.g. a gallery grid) → one `![alt](...)` per entry. A bare identifier array (`images={[a, b]}`) works too.
+- Every other top-level `import` line is stripped regardless, so no leftover Astro/JS syntax reaches a provider even when it isn't image-related.
+
+A folder-driven component (`<MapGallery folderPath="..." />` and similar) is different: the list of images it renders is never written in the source at all, some integration resolves it from disk at build time. This package can't know that convention, so pass `resolveFolderImages` in `syndicationOptions` to supply it yourself:
+
+```ts
+import fg from 'fast-glob';
+import { join } from 'node:path';
+
+export const syndicationOptions: SyndicationOptions = {
+  // ...
+  resolveFolderImages: async (folderPath) => {
+    const dir = join(process.cwd(), 'src/assets', folderPath.replace(/^images\//, ''));
+    const files = await fg('*.{jpg,jpeg,png,webp}', { cwd: dir, absolute: true });
+    return files.sort().map((path) => ({ path }));
+  },
+};
+```
+
+Without this option, a `folderPath` component is removed from the body sent to a provider and a warning is logged, rather than guessing at which files it would have shown.
+
 ### Undoing a sync
 
 `resetContentDir(contentDir)` / `clearDeployments(filePath)` (from `src/integrations/syndication/reset.ts`, exported from the package) strip the `deployments` block back out of a post's frontmatter, restoring it to its pre-sync state. `scripts/reset-content.ts` is a small CLI wrapper around it:
