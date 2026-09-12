@@ -1,7 +1,10 @@
 ---
 title: How We Syndicate Posts to dev.to
 slug: how-we-syndicate-posts
-syndicate: true
+# Per-provider, not a blanket flag: this post is a good fit for dev.to, but
+# that's a choice made per post, not implied by the file merely existing.
+syndicate:
+  devto: true
 coverImage: /covers/markdown-post-cover.png
 description: >-
   A walk-through of the build-time pipeline that pushes this blog's posts to

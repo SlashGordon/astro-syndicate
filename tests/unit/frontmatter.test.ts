@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeTags, normalizeText } from '../../src/integrations/syndication/frontmatter';
+import { normalizeTags, normalizeText, resolveSyndicateTargets } from '../../src/integrations/syndication/frontmatter';
+import type { SyncContext, SyncResult, SyndicationProvider } from '../../src/integrations/syndication/types';
+
+function makeProvider(name: string): SyndicationProvider {
+  return {
+    name,
+    setup: async () => {},
+    sync: async (_ctx: SyncContext): Promise<SyncResult> => ({ provider: name, action: 'created', message: '' }),
+  };
+}
 
 describe('normalizeTags', () => {
   it('accepts an array of strings', () => {
@@ -44,5 +53,41 @@ describe('normalizeText', () => {
     expect(normalizeText(42)).toBeUndefined();
     expect(normalizeText(undefined)).toBeUndefined();
     expect(normalizeText(null)).toBeUndefined();
+  });
+});
+
+describe('resolveSyndicateTargets', () => {
+  const devto = makeProvider('devto');
+  const medium = makeProvider('medium');
+  const providers = [devto, medium];
+
+  it('opts into every configured provider for the legacy `syndicate: true` form', () => {
+    expect(resolveSyndicateTargets(true, providers)).toEqual([devto, medium]);
+  });
+
+  it('opts into only the providers explicitly set to true', () => {
+    expect(resolveSyndicateTargets({ devto: true, medium: false }, providers)).toEqual([devto]);
+  });
+
+  it('opts into nothing for a provider missing from the object', () => {
+    expect(resolveSyndicateTargets({ devto: true }, providers)).toEqual([devto]);
+    expect(resolveSyndicateTargets({}, providers)).toEqual([]);
+  });
+
+  it('ignores a key that does not match any configured provider', () => {
+    expect(resolveSyndicateTargets({ hashnode: true }, providers)).toEqual([]);
+  });
+
+  it('opts into nothing for `false`, missing, or any other non-object value', () => {
+    expect(resolveSyndicateTargets(false, providers)).toEqual([]);
+    expect(resolveSyndicateTargets(undefined, providers)).toEqual([]);
+    expect(resolveSyndicateTargets(null, providers)).toEqual([]);
+    expect(resolveSyndicateTargets('devto', providers)).toEqual([]);
+    expect(resolveSyndicateTargets(1, providers)).toEqual([]);
+  });
+
+  it('returns an empty array when no providers are configured at all', () => {
+    expect(resolveSyndicateTargets(true, [])).toEqual([]);
+    expect(resolveSyndicateTargets({ devto: true }, [])).toEqual([]);
   });
 });

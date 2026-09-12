@@ -5,7 +5,7 @@ import matter from 'gray-matter';
 
 import { AssetPipeline, findImageRefs, isRemoteRef } from './assets.js';
 import { appendBacklink, type BacklinkOption } from './backlink.js';
-import { normalizeTags, normalizeText } from './frontmatter.js';
+import { normalizeTags, normalizeText, resolveSyndicateTargets } from './frontmatter.js';
 import { generateContentHash } from './hashing.js';
 import type { FolderImage } from './mdx-jsx.js';
 import { resolveMdxImages } from './mdx-jsx.js';
@@ -31,7 +31,12 @@ export interface SyndicationLogger {
 }
 
 export interface SyndicationOptions {
-  /** Providers to run, in registration order. */
+  /**
+   * Providers to run, in registration order. Being configured here makes a
+   * provider *available*, not automatic - each post's own `syndicate`
+   * frontmatter (keyed by provider name) decides which of these it actually
+   * opts into. See `resolveSyndicateTargets` in `frontmatter.ts`.
+   */
   providers: SyndicationProvider[];
   /** Blog content directory, relative to the project root. */
   contentDir?: string;
@@ -171,14 +176,15 @@ export async function runSyndication(options: RunSyndicationOptions): Promise<Ru
     // calls in one process, not just a test-fixture fluke.
     const data: Record<string, unknown> = { ...parsed.data };
 
-    // 1. Opt-in gate.
-    if (data.syndicate !== true) {
+    // 1. Opt-in gate: which of the configured providers, if any, want this post.
+    const targets = resolveSyndicateTargets(data.syndicate, providers);
+    if (targets.length === 0) {
       continue;
     }
 
     const title = typeof data.title === 'string' ? data.title.trim() : '';
     if (!title) {
-      logger.warn(`${rel}: "syndicate: true" but no title - skipped`);
+      logger.warn(`${rel}: opts into syndication but has no title - skipped`);
       continue;
     }
 
@@ -305,9 +311,9 @@ export async function runSyndication(options: RunSyndicationOptions): Promise<Ru
         data,
       };
 
-      // 5. Run every provider for this post.
+      // 5. Run only the providers this post opted into.
 
-      for (const provider of providers) {
+      for (const provider of targets) {
         const ctx: SyncContext = { post, deployments, contentHash, isModified };
 
         let result;

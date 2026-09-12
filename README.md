@@ -10,7 +10,7 @@
 
 An Astro integration that syndicates Markdown/MDX blog posts to external platforms (dev.to, with Hashnode and Medium designed to slot in later) as part of `astro build`.
 
-It hashes each post's title and content, compares that hash against what was stored the last time it synced, and only calls a platform's API when something changed. Posts opt in via `syndicate: true` in frontmatter. Local images can be uploaded to a host of your choosing and rewritten to absolute URLs before a post goes out, since dev.to has no reliable image-upload API of its own.
+It hashes each post's title and content, compares that hash against what was stored the last time it synced, and only calls a platform's API when something changed. Posts opt in per provider - `syndicate: { devto: true }` - since a post that suits dev.to doesn't always suit every other platform you've configured. Local images can be uploaded to a host of your choosing and rewritten to absolute URLs before a post goes out, since dev.to has no reliable image-upload API of its own.
 
 Every new post syncs as a draft on dev.to (`published: false`) by default - nothing goes live until you change that yourself. Set `DevToProvider`'s `published: true` (or `DEVTO_PUBLISHED=true`) to have new posts publish immediately instead; either way, an update to an already-synced post never touches that field, so a post you've published by hand stays published.
 
@@ -19,8 +19,8 @@ Every new post syncs as a draft on dev.to (`published: false`) by default - noth
 ## How it works
 
 1. Something triggers a sync - either `astro build` finishing, or a plain script call. Either way, the actual work is one call to `runSyndication()`, which scans `src/content/blog/` for `.md` / `.mdx` files.
-2. For each file with `syndicate: true`, it parses frontmatter with `gray-matter`, resolves any local images through an `AssetUploader`, and computes a SHA-256 hash of the title, content, and referenced image fingerprints.
-3. It compares that hash to `deployments.contentHash` in the frontmatter:
+2. For each file, `syndicate` in its frontmatter says which configured providers, if any, it opts into (see below) - a file opting into none is skipped entirely. For the rest, it parses frontmatter with `gray-matter`, resolves any local images through an `AssetUploader`, and computes a SHA-256 hash of the title, content, and referenced image fingerprints.
+3. For each provider a post opted into, it compares that hash to `deployments.contentHash` in the frontmatter:
    - no `deployments.<provider>` yet: creates a new post
    - hash changed: updates the existing post
    - hash unchanged: skips the API call
@@ -70,7 +70,7 @@ Two things that step relies on:
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| `syndicate` | yes | Must be `true`, or the file is skipped entirely. |
+| `syndicate` | yes | Per-provider: `{ devto: true, medium: false }`. A provider missing from the object defaults to `false` - opting in is always explicit. `syndicate: true` still works, as shorthand for "every configured provider". No provider opted in = the file is skipped entirely. |
 | `title` | yes | |
 | `slug` | no | Defaults to the file name. |
 | `canonicalUrl` | no | Defaults to `${siteUrl}/blog/${slug}/`. |

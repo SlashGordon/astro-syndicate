@@ -10,9 +10,10 @@ import type { SyncContext, SyncResult, SyndicationProvider } from '../../src/int
 
 /** Records every call instead of touching the network - proves standalone use needs no Astro at all. */
 class FakeProvider implements SyndicationProvider {
-  public readonly name = 'fake';
   public setupCalls = 0;
   public syncCalls: SyncContext[] = [];
+
+  constructor(public readonly name: string = 'fake') {}
 
   async setup(): Promise<void> {
     this.setupCalls += 1;
@@ -63,6 +64,62 @@ describe('runSyndication (standalone, no Astro involved)', () => {
 
     const written = matter(await readFile(join(dir, 'blog', 'post.md'), 'utf8'));
     expect(written.data.deployments.fake).toBe(1);
+  });
+
+  it('only syncs a post to the providers named true in its `syndicate` frontmatter', async () => {
+    await writeFile(
+      join(dir, 'blog', 'devto-only.md'),
+      matter.stringify('Body.\n', { title: 'Devto Only', syndicate: { devto: true, medium: false } }),
+    );
+    await writeFile(
+      join(dir, 'blog', 'medium-only.md'),
+      matter.stringify('Body.\n', { title: 'Medium Only', syndicate: { medium: true } }),
+    );
+    await writeFile(
+      join(dir, 'blog', 'neither.md'),
+      matter.stringify('Body.\n', { title: 'Neither', syndicate: { devto: false, medium: false } }),
+    );
+    await writeFile(
+      join(dir, 'blog', 'not-flagged.md'),
+      matter.stringify('Body.\n', { title: 'Not Flagged' }),
+    );
+
+    const devto = new FakeProvider('devto');
+    const medium = new FakeProvider('medium');
+
+    await runSyndication({
+      providers: [devto, medium],
+      projectRoot: dir,
+      contentDir: 'blog',
+      siteUrl: 'https://example.com',
+      requestDelayMs: 0,
+      logger: fakeLogger(),
+    });
+
+    expect(devto.syncCalls.map((ctx) => ctx.post.title)).toEqual(['Devto Only']);
+    expect(medium.syncCalls.map((ctx) => ctx.post.title)).toEqual(['Medium Only']);
+  });
+
+  it('still opts into every configured provider for the legacy `syndicate: true` form', async () => {
+    await writeFile(
+      join(dir, 'blog', 'post.md'),
+      matter.stringify('Body.\n', { title: 'Post', syndicate: true }),
+    );
+
+    const devto = new FakeProvider('devto');
+    const medium = new FakeProvider('medium');
+
+    await runSyndication({
+      providers: [devto, medium],
+      projectRoot: dir,
+      contentDir: 'blog',
+      siteUrl: 'https://example.com',
+      requestDelayMs: 0,
+      logger: fakeLogger(),
+    });
+
+    expect(devto.syncCalls).toHaveLength(1);
+    expect(medium.syncCalls).toHaveLength(1);
   });
 
   it('defaults to `console` when no logger is given', async () => {

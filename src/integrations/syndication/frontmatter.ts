@@ -5,6 +5,36 @@
  * the provider that owns the limit.
  */
 
+import type { SyndicationProvider } from './types.js';
+
+/**
+ * Resolve which of the configured providers a post opts into.
+ *
+ * `syndicate` is per-provider, keyed by `SyndicationProvider.name`:
+ *
+ *   syndicate:
+ *     devto: true
+ *     medium: false
+ *
+ * A post that suits dev.to but not Medium (or vice versa) needs to say so -
+ * a single blanket flag can't express that. A provider missing from the
+ * object defaults to `false`: opting in is always explicit, never implied by
+ * omission. `syndicate: true` still works too, as shorthand for "every
+ * configured provider" - the whole frontmatter contract before this existed,
+ * and still the simplest form while there's only one provider in play.
+ * Anything else (`false`, missing, a string, `null`, ...) opts into nothing.
+ */
+export function resolveSyndicateTargets(
+  value: unknown,
+  providers: readonly SyndicationProvider[],
+): SyndicationProvider[] {
+  if (value === true) return [...providers];
+  if (!value || typeof value !== 'object') return [];
+
+  const flags = value as Record<string, unknown>;
+  return providers.filter((provider) => flags[provider.name] === true);
+}
+
 /**
  * Normalize a frontmatter `tags` value into a clean, deduplicated list.
  * Accepts an array (`tags: [Astro, typescript]`) or a comma-separated string
