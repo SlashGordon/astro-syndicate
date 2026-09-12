@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/SlashGordon/astro-syndicate/compare/v0.4.0...v0.4.1) (2026-09-12)
+
+
+### Bug Fixes
+
+* widen astro peer dependency to include 6.x and 7.x ([02463b1](https://github.com/SlashGordon/astro-syndicate/commit/02463b155b6d4031f961a659c9aedc6c934a532e))
+
 ## [0.4.0](https://github.com/SlashGordon/astro-syndicate/compare/v0.3.0...v0.4.0) (2026-09-12)
 
 
