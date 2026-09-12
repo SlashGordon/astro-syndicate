@@ -35,10 +35,11 @@ export const IMAGE_EXTENSIONS = new Set(Object.keys(MIME_BY_EXT));
 // A post relying on either has that image silently left untouched.
 
 const MARKDOWN_IMAGE =
-  /!\[[^\]]*\]\(\s*(<[^>]+>|[^)\s]+)(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/gd;
+  /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/gd;
 // Requires a literal whitespace right before "src" so "data-src=" (common in
 // lazy-loading themes) never matches — only whitespace precedes a real attribute.
 const HTML_IMG_SRC = /<img\b[^>]*?\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)')[^>]*>/gid;
+const HTML_IMG_ALT = /\salt\s*=\s*(?:"([^"]*)"|'([^']*)')/;
 const FENCED_CODE_BLOCK = /^([`~]{3,})[^\n]*\n[\s\S]*?^\1[ \t]*$/gm;
 const INLINE_CODE_SPAN = /(`+)(?!`)[\s\S]*?\1/g;
 
@@ -77,6 +78,8 @@ interface ImageOccurrence {
   /** Absolute start/end of the span to replace (includes `<...>` if present). */
   start: number;
   end: number;
+  /** Alt text at this occurrence, if any - lets an uploader tell two images in the same post apart. */
+  alt?: string;
 }
 
 /** Every image occurrence in a Markdown body, code spans excluded, in document order. */
@@ -86,14 +89,15 @@ function findOccurrences(markdown: string): ImageOccurrence[] {
 
   for (const match of markdown.matchAll(MARKDOWN_IMAGE)) {
     if (isMasked(match.index, ranges)) continue;
-    const [start, end] = match.indices![1]!;
-    occurrences.push({ ref: stripAngles(markdown.slice(start, end)), start, end });
+    const [start, end] = match.indices![2]!;
+    occurrences.push({ ref: stripAngles(markdown.slice(start, end)), start, end, alt: match[1] });
   }
 
   for (const match of markdown.matchAll(HTML_IMG_SRC)) {
     if (isMasked(match.index, ranges)) continue;
     const [start, end] = (match.indices![1] ?? match.indices![2])!;
-    occurrences.push({ ref: markdown.slice(start, end), start, end });
+    const altMatch = HTML_IMG_ALT.exec(match[0]);
+    occurrences.push({ ref: markdown.slice(start, end), start, end, alt: altMatch?.[1] ?? altMatch?.[2] });
   }
 
   return occurrences.sort((a, b) => a.start - b.start);
@@ -136,6 +140,8 @@ export interface AssetPipelineOptions {
   cache: Record<string, string>;
   /** ms to wait after each real upload (rate-limit guard). */
   requestDelayMs: number;
+  /** Slug of the post being processed, passed straight through to `AssetUploader.upload()`. */
+  slug: string;
   log: (message: string) => void;
 }
 
@@ -174,7 +180,7 @@ export class AssetPipeline {
   }
 
   /** Map one reference to a hosted URL. Unresolvable refs come back unchanged. */
-  public async resolve(ref: string): Promise<string> {
+  public async resolve(ref: string, alt?: string): Promise<string> {
     if (isRemoteRef(ref)) return ref;
 
     const absPath = refToPath(ref, this.#opts.postDir, this.#opts.publicDir);
@@ -207,6 +213,8 @@ export class AssetPipeline {
       hash,
       bytes,
       contentType: MIME_BY_EXT[extname(absPath).toLowerCase()] ?? 'application/octet-stream',
+      alt,
+      slug: this.#opts.slug,
     });
 
     this.#cache[cacheKey] = uploaded.url;
@@ -224,11 +232,19 @@ export class AssetPipeline {
   /** Rewrite every local image reference in a Markdown body to its hosted URL. */
   public async rewriteMarkdown(markdown: string): Promise<string> {
     const map = new Map<string, string>();
+    const seenRefs = new Set<string>();
 
-    for (const ref of findImageRefs(markdown)) {
-      const url = await this.resolve(ref);
-      if (url !== ref) {
-        map.set(ref, url);
+    // Resolve each distinct ref once, using the alt text of its *first*
+    // occurrence - the same file referenced twice is the same upload either
+    // way, so only the first occurrence's alt is available to an uploader
+    // that needs one to disambiguate (e.g. matching it against rendered HTML).
+    for (const occurrence of findOccurrences(markdown)) {
+      if (seenRefs.has(occurrence.ref)) continue;
+      seenRefs.add(occurrence.ref);
+
+      const url = await this.resolve(occurrence.ref, occurrence.alt);
+      if (url !== occurrence.ref) {
+        map.set(occurrence.ref, url);
       }
     }
 

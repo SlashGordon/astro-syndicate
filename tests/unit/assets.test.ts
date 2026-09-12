@@ -112,6 +112,7 @@ describe('AssetPipeline', () => {
       publicDir: '/public',
       cache: {},
       requestDelayMs: 0,
+      slug: 'test-post',
       log: vi.fn(),
     });
 
@@ -130,6 +131,7 @@ describe('AssetPipeline', () => {
       publicDir: '/public',
       cache: {},
       requestDelayMs: 0,
+      slug: 'test-post',
       log,
     });
 
@@ -150,6 +152,7 @@ describe('AssetPipeline', () => {
       publicDir: '/public',
       cache: {},
       requestDelayMs: 0,
+      slug: 'test-post',
       log: vi.fn(),
     });
 
@@ -181,6 +184,7 @@ describe('AssetPipeline', () => {
       publicDir: '/public',
       cache: {},
       requestDelayMs: 0,
+      slug: 'test-post',
       log: vi.fn(),
     });
     const firstUrl = await first.resolve('./assets.test.ts');
@@ -192,6 +196,7 @@ describe('AssetPipeline', () => {
       publicDir: '/public',
       cache: first.assetMap,
       requestDelayMs: 0,
+      slug: 'test-post',
       log: vi.fn(),
     });
     const secondUrl = await second.resolve('./assets.test.ts');
@@ -216,6 +221,7 @@ describe('AssetPipeline', () => {
       publicDir: '/public',
       cache: {},
       requestDelayMs: 0,
+      slug: 'test-post',
       log: vi.fn(),
     });
     const oldUrl = await first.resolve('./assets.test.ts');
@@ -229,6 +235,7 @@ describe('AssetPipeline', () => {
       publicDir: '/public',
       cache: first.assetMap,
       requestDelayMs: 0,
+      slug: 'test-post',
       log: vi.fn(),
     });
     const newUrl = await second.resolve('./assets.test.ts');
@@ -250,6 +257,7 @@ describe('AssetPipeline', () => {
       publicDir: THIS_DIR,
       cache: {},
       requestDelayMs: 0,
+      slug: 'test-post',
       log: vi.fn(),
     });
 

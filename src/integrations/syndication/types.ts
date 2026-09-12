@@ -61,6 +61,15 @@ export interface AssetSource {
   bytes: Buffer;
   /** Best-effort MIME type derived from the file extension. */
   contentType: string;
+  /**
+   * Alt text from the first occurrence of this reference in the post, if any -
+   * an uploader that looks the image up elsewhere (e.g. `DistHtmlUploader`
+   * matching it against a rendered page) can use this to tell two images in
+   * the same post apart. Empty when the occurrence has no alt text.
+   */
+  alt?: string;
+  /** Slug of the post this image belongs to, from the same frontmatter `runSyndication` already resolved a slug for. */
+  slug: string;
 }
 
 /**

@@ -241,6 +241,7 @@ export async function runSyndication(options: RunSyndicationOptions): Promise<Ru
         publicDir,
         cache: prevAssets,
         requestDelayMs,
+        slug,
         log: (message) => logger.info(`${rel} [assets]: ${message}`),
       });
 

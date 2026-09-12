@@ -11,6 +11,7 @@ function makeAsset(overrides: Partial<AssetSource> = {}): AssetSource {
     hash: 'abc123',
     bytes: Buffer.from('fake-image-bytes'),
     contentType: 'image/png',
+    slug: 'test-post',
     ...overrides,
   };
 }

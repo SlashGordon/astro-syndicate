@@ -82,6 +82,30 @@ export const syndicationOptions: SyndicationOptions = {
 
 Without this option, a `folderPath` component is removed from the body sent to a provider and a warning is logged, rather than guessing at which files it would have shown.
 
+### Choosing an asset host
+
+`assetUploader` decides where a post's local images end up. Three ship with the package:
+
+| Uploader | How it resolves an image | When to use it |
+| --- | --- | --- |
+| `CloudinaryUploader` | Uploads the file to Cloudinary via an unsigned preset. | No public site to point at yet, or images live outside `distDir`/`publicDir` entirely. |
+| `SiteUrlUploader` | Rewrites to `${siteUrl}/<path>`, no upload at all. | Images are copied verbatim into Astro's `public/` dir, so the deployed path is the same as the source path. |
+| `DistHtmlUploader` | Reads the post's own already-built page and reuses whatever URL Astro gave that image there. | Images go through `astro:assets` or a gallery integration (so their deployed filename is a build-time content hash `SiteUrlUploader` can't predict), **and** syndication runs *after* your host has deployed - see "Two ways to trigger it" above. |
+
+`DistHtmlUploader` needs `distDir` (the built output, still on disk at that point) and `siteUrl`; `pagePath` maps a slug to its URL path when posts don't render at the plain `/<slug>/` root:
+
+```ts
+import { DistHtmlUploader } from 'astro-syndicate';
+
+assetUploader: new DistHtmlUploader({
+  distDir: new URL('./dist', import.meta.url).pathname,
+  siteUrl: SITE,
+  pagePath: (slug) => `post/${slug}`, // for a site where posts render at /post/<slug>/
+}),
+```
+
+It matches each image against the `<img>` tags inside that page's `<main>` or `<article>`: first by exact `alt` text, then by position among whichever tags no earlier image in the same post already claimed. A post where every image sets a distinct `alt` (the common case) matches exactly; images sharing identical or empty `alt` text fall back to document order, which usually - but not always - lines up.
+
 ### Undoing a sync
 
 `resetContentDir(contentDir)` / `clearDeployments(filePath)` (from `src/integrations/syndication/reset.ts`, exported from the package) strip the `deployments` block back out of a post's frontmatter, restoring it to its pre-sync state. `scripts/reset-content.ts` is a small CLI wrapper around it:

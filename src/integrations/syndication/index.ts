@@ -61,3 +61,5 @@ export type {
 export { DevToProvider } from './providers/devto.js';
 export { SiteUrlUploader } from './uploaders/site-url.js';
 export { CloudinaryUploader } from './uploaders/cloudinary.js';
+export { DistHtmlUploader } from './uploaders/dist-html.js';
+export type { DistHtmlUploaderOptions } from './uploaders/dist-html.js';
