@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DistHtmlUploader } from '../../src/integrations/syndication/uploaders/dist-html';
 import type { AssetSource } from '../../src/integrations/syndication/types';
@@ -111,5 +111,109 @@ describe('DistHtmlUploader', () => {
   it('setup() rejects a non-absolute siteUrl', () => {
     const uploader = new DistHtmlUploader({ distDir, siteUrl: '/not-absolute' });
     expect(() => uploader.setup()).toThrow(/absolute siteUrl/);
+  });
+
+  describe('a realistic page with many images that do not belong to the post', () => {
+    // A full layout: nav logo, a hero banner, a decorative background image
+    // on <body>'s own inline style (not an <img> at all), a sidebar full of
+    // "related posts" thumbnails, and a footer full of social icons - all
+    // outside <article> - surrounding three real content images inside it,
+    // one of them alt-less to also exercise positional matching in a
+    // realistically noisy document instead of a two-image toy page.
+    async function writeFullPage(slug: string): Promise<void> {
+      const dir = join(distDir, slug);
+      await mkdir(dir, { recursive: true });
+      const distractors = Array.from(
+        { length: 6 },
+        (_, i) => `<img src="/related/${i}.jpg" alt="Related post ${i}">`,
+      ).join('');
+      const socialIcons = ['twitter', 'github', 'mastodon', 'rss']
+        .map((name) => `<img src="/icons/${name}.svg" alt="${name}">`)
+        .join('');
+      const html = `<html><body>
+        <nav><img src="/logo.svg" alt="Site logo"></nav>
+        <div class="hero" style="background-image:url(/hero.jpg)"></div>
+        <aside class="sidebar"><h2>Related</h2>${distractors}</aside>
+        <article>
+          <h1>A real post</h1>
+          <p>Some text.</p>
+          <img src="/assets/first.hash1.webp" alt="First real photo">
+          <p>More text in between.</p>
+          <img src="/assets/second.hash2.webp" alt="">
+          <p>Even more text.</p>
+          <img src="/assets/third.hash3.webp" alt="Third real photo">
+        </article>
+        <footer>${socialIcons}</footer>
+      </body></html>`;
+      await writeFile(join(dir, 'index.html'), html);
+    }
+
+    it('picks only the real content images, ignoring every distractor outside <article>', async () => {
+      await writeFullPage('noisy-post');
+      const uploader = new DistHtmlUploader({ distDir, siteUrl: 'https://example.com' });
+      uploader.setup();
+
+      const first = await uploader.upload(asset({ slug: 'noisy-post', ref: './first.jpg', alt: 'First real photo' }));
+      const third = await uploader.upload(asset({ slug: 'noisy-post', ref: './third.jpg', alt: 'Third real photo' }));
+      // No alt on this one - positional fallback must land on the one
+      // remaining unclaimed *article* image, not any of the ten distractors
+      // that sit earlier in the raw HTML (nav, hero-adjacent, sidebar).
+      const second = await uploader.upload(asset({ slug: 'noisy-post', ref: './second.jpg', alt: '' }));
+
+      expect(first.url).toBe('https://example.com/assets/first.hash1.webp');
+      expect(third.url).toBe('https://example.com/assets/third.hash3.webp');
+      expect(second.url).toBe('https://example.com/assets/second.hash2.webp');
+    });
+
+    it('reports a plausibility mismatch when the Markdown image count does not match the rendered count', async () => {
+      await writeFullPage('noisy-post');
+      const log = vi.fn();
+      const uploader = new DistHtmlUploader({ distDir, siteUrl: 'https://example.com', log });
+      uploader.setup();
+
+      // The post's Markdown claims 5 local images; the article only rendered 3.
+      await uploader.upload(asset({ slug: 'noisy-post', ref: './first.jpg', alt: 'First real photo', totalLocalImages: 5 }));
+
+      expect(log).toHaveBeenCalledWith(expect.stringContaining('plausibility check failed'));
+      expect(log).toHaveBeenCalledWith(expect.stringContaining('references 5 local image(s)'));
+      expect(log).toHaveBeenCalledWith(expect.stringContaining('3 <img> tag(s) were found'));
+    });
+
+    it('does not warn when the Markdown image count matches the rendered count', async () => {
+      await writeFullPage('noisy-post');
+      const log = vi.fn();
+      const uploader = new DistHtmlUploader({ distDir, siteUrl: 'https://example.com', log });
+      uploader.setup();
+
+      await uploader.upload(asset({ slug: 'noisy-post', ref: './first.jpg', alt: 'First real photo', totalLocalImages: 3 }));
+
+      expect(log).not.toHaveBeenCalledWith(expect.stringContaining('plausibility check failed'));
+    });
+
+    it('only checks plausibility once per post, even across several images', async () => {
+      await writeFullPage('noisy-post');
+      const log = vi.fn();
+      const uploader = new DistHtmlUploader({ distDir, siteUrl: 'https://example.com', log });
+      uploader.setup();
+
+      await uploader.upload(asset({ slug: 'noisy-post', ref: './first.jpg', alt: 'First real photo', totalLocalImages: 5 }));
+      await uploader.upload(asset({ slug: 'noisy-post', ref: './third.jpg', alt: 'Third real photo', totalLocalImages: 5 }));
+
+      const mismatchWarnings = log.mock.calls.filter(([msg]) => String(msg).includes('plausibility check failed'));
+      expect(mismatchWarnings).toHaveLength(1);
+    });
+
+    it('logs an alt-text match distinctly from a positional fallback match', async () => {
+      await writeFullPage('noisy-post');
+      const log = vi.fn();
+      const uploader = new DistHtmlUploader({ distDir, siteUrl: 'https://example.com', log });
+      uploader.setup();
+
+      await uploader.upload(asset({ slug: 'noisy-post', ref: './first.jpg', alt: 'First real photo' }));
+      await uploader.upload(asset({ slug: 'noisy-post', ref: './second.jpg', alt: '' }));
+
+      expect(log).toHaveBeenCalledWith(expect.stringContaining('matched by alt text "First real photo"'));
+      expect(log).toHaveBeenCalledWith(expect.stringContaining('fell back to position'));
+    });
   });
 });

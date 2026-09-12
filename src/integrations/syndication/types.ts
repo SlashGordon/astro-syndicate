@@ -70,6 +70,15 @@ export interface AssetSource {
   alt?: string;
   /** Slug of the post this image belongs to, from the same frontmatter `runSyndication` already resolved a slug for. */
   slug: string;
+  /**
+   * Count of local (non-remote) image occurrences found in this post's body -
+   * every usage, not deduplicated by reference, since a source file used
+   * twice renders as two separate `<img>` tags. Lets an uploader that looks
+   * images up elsewhere sanity-check its own count against this one and warn
+   * on a mismatch, rather than silently mis-matching. `undefined` when the
+   * caller building this `AssetSource` doesn't compute it.
+   */
+  totalLocalImages?: number;
 }
 
 /**

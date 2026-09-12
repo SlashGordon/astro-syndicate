@@ -42,6 +42,14 @@ export interface DistHtmlUploaderOptions {
    * somewhere else, e.g. `(slug) => \`post/${slug}\`` for `/post/<slug>/`.
    */
   pagePath?: (slug: string) => string;
+  /**
+   * Reports which matching strategy each image took (exact `alt`, or the
+   * riskier positional fallback) and flags a post where the number of
+   * `<img>` tags found doesn't match the number of local images its Markdown
+   * references - a page missing an image, or one the pipeline doesn't
+   * recognise, tends to show up here first. Defaults to a no-op.
+   */
+  log?: (message: string) => void;
 }
 
 /**
@@ -71,13 +79,16 @@ export class DistHtmlUploader implements AssetUploader {
   readonly #distDir: string;
   readonly #siteUrl: string;
   readonly #pagePath: (slug: string) => string;
+  readonly #log: (message: string) => void;
   readonly #htmlCache = new Map<string, RenderedImage[] | undefined>();
   readonly #claimed = new Map<string, Set<number>>();
+  readonly #countChecked = new Set<string>();
 
   constructor(options: DistHtmlUploaderOptions) {
     this.#distDir = options.distDir;
     this.#siteUrl = withTrailingSlash(options.siteUrl);
     this.#pagePath = options.pagePath ?? ((slug) => slug);
+    this.#log = options.log ?? (() => {});
   }
 
   public setup(): void {
@@ -103,6 +114,27 @@ export class DistHtmlUploader implements AssetUploader {
     return images;
   }
 
+  /**
+   * Warns, once per slug, when the number of `<img>` tags found doesn't match
+   * the number of local images the post's Markdown references. Equal counts
+   * don't prove every match is correct, but a mismatch is a strong, easy
+   * signal that something is off - a missing image, one added outside a
+   * syntax `resolveMdxImages` recognises, or unrelated markup slipping into
+   * the scoped region.
+   */
+  #checkPlausibleCount(slug: string, images: RenderedImage[], expected: number | undefined): void {
+    if (expected === undefined || this.#countChecked.has(slug)) return;
+    this.#countChecked.add(slug);
+
+    if (images.length !== expected) {
+      this.#log(
+        `plausibility check failed for "${slug}": its Markdown references ${expected} local image(s), ` +
+          `but ${images.length} <img> tag(s) were found in the built page's <main>/<article> - ` +
+          'matches below may be wrong; double-check alt text and that every image actually rendered',
+      );
+    }
+  }
+
   public async upload(asset: AssetSource): Promise<UploadedAsset> {
     const images = await this.#imagesFor(asset.slug);
     if (!images) {
@@ -111,16 +143,29 @@ export class DistHtmlUploader implements AssetUploader {
           'DistHtmlUploader needs the site already built (and deployed) before syndication runs',
       );
     }
+    this.#checkPlausibleCount(asset.slug, images, asset.totalLocalImages);
 
     const claimed = this.#claimed.get(asset.slug) ?? new Set<number>();
     this.#claimed.set(asset.slug, claimed);
 
+    // Alt text is the safest signal available: it is an explicit, exact
+    // match rather than an assumption about rendering order, so it is tried
+    // first and always wins over position when both would apply.
     let index = -1;
     if (asset.alt) {
       index = images.findIndex((img, i) => !claimed.has(i) && img.alt === asset.alt);
     }
-    if (index === -1) {
+
+    if (index !== -1) {
+      this.#log(`"${asset.ref}" on "${asset.slug}": matched by alt text "${asset.alt}"`);
+    } else {
       index = images.findIndex((_img, i) => !claimed.has(i));
+      if (index !== -1) {
+        this.#log(
+          `"${asset.ref}" on "${asset.slug}": no alt match (alt: ${asset.alt || '<none>'}), ` +
+            `fell back to position ${index} - set a unique alt on this image to make the match exact`,
+        );
+      }
     }
 
     if (index === -1) {

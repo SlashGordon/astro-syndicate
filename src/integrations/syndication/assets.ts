@@ -180,7 +180,7 @@ export class AssetPipeline {
   }
 
   /** Map one reference to a hosted URL. Unresolvable refs come back unchanged. */
-  public async resolve(ref: string, alt?: string): Promise<string> {
+  public async resolve(ref: string, alt?: string, totalLocalImages?: number): Promise<string> {
     if (isRemoteRef(ref)) return ref;
 
     const absPath = refToPath(ref, this.#opts.postDir, this.#opts.publicDir);
@@ -215,6 +215,7 @@ export class AssetPipeline {
       contentType: MIME_BY_EXT[extname(absPath).toLowerCase()] ?? 'application/octet-stream',
       alt,
       slug: this.#opts.slug,
+      totalLocalImages,
     });
 
     this.#cache[cacheKey] = uploaded.url;
@@ -234,15 +235,21 @@ export class AssetPipeline {
     const map = new Map<string, string>();
     const seenRefs = new Set<string>();
 
+    const occurrences = findOccurrences(markdown);
+    // Every local occurrence, not deduplicated by ref: a source file used
+    // twice renders as two separate `<img>` tags, so this is the number an
+    // uploader matching against rendered HTML should expect to find there.
+    const totalLocalImages = occurrences.filter((occurrence) => !isRemoteRef(occurrence.ref)).length;
+
     // Resolve each distinct ref once, using the alt text of its *first*
     // occurrence - the same file referenced twice is the same upload either
     // way, so only the first occurrence's alt is available to an uploader
     // that needs one to disambiguate (e.g. matching it against rendered HTML).
-    for (const occurrence of findOccurrences(markdown)) {
+    for (const occurrence of occurrences) {
       if (seenRefs.has(occurrence.ref)) continue;
       seenRefs.add(occurrence.ref);
 
-      const url = await this.resolve(occurrence.ref, occurrence.alt);
+      const url = await this.resolve(occurrence.ref, occurrence.alt, totalLocalImages);
       if (url !== occurrence.ref) {
         map.set(occurrence.ref, url);
       }

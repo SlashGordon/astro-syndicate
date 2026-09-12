@@ -106,6 +106,21 @@ assetUploader: new DistHtmlUploader({
 
 It matches each image against the `<img>` tags inside that page's `<main>` or `<article>`: first by exact `alt` text, then by position among whichever tags no earlier image in the same post already claimed. A post where every image sets a distinct `alt` (the common case) matches exactly; images sharing identical or empty `alt` text fall back to document order, which usually - but not always - lines up.
 
+**Always set `alt` text on your images.** It's the one signal in this whole process that identifies an image by *what it is* rather than *where it happens to sit* - everything else (positional fallback, the plausibility check below) is a best-effort guess that only exists because `alt` wasn't there to make the match exact. Two images in the same post sharing an `alt` (including two left empty) both fall onto positional matching, which a reordered paragraph or an image added earlier in the post can quietly throw off.
+
+Pass `log` to see which strategy each image actually used, and to catch a mismatch between how many local images a post's Markdown references and how many `<img>` tags were actually found - a strong signal something didn't render the way the post expects, worth checking before trusting the URLs that came back:
+
+```ts
+new DistHtmlUploader({
+  distDir: new URL('./dist', import.meta.url).pathname,
+  siteUrl: SITE,
+  log: (message) => console.log(`[dist-html] ${message}`),
+});
+// "first.jpg" on "my-post": matched by alt text "First real photo"
+// "second.jpg" on "my-post": no alt match (alt: <none>), fell back to position 1 - set a unique alt on this image to make the match exact
+// plausibility check failed for "my-post": its Markdown references 5 local image(s), but 3 <img> tag(s) were found in the built page's <main>/<article> - matches below may be wrong; double-check alt text and that every image actually rendered
+```
+
 ### Undoing a sync
 
 `resetContentDir(contentDir)` / `clearDeployments(filePath)` (from `src/integrations/syndication/reset.ts`, exported from the package) strip the `deployments` block back out of a post's frontmatter, restoring it to its pre-sync state. `scripts/reset-content.ts` is a small CLI wrapper around it:
