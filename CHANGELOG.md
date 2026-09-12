@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/SlashGordon/astro-syndicate/compare/v0.4.1...v0.5.0) (2026-09-12)
+
+
+### Features
+
+* opt into syndication per provider, not with one blanket flag ([8eb0d1a](https://github.com/SlashGordon/astro-syndicate/commit/8eb0d1a15bb3080e2102bc369bc1b0070175c9a9))
+
 ## [0.4.1](https://github.com/SlashGordon/astro-syndicate/compare/v0.4.0...v0.4.1) (2026-09-12)
 
 
