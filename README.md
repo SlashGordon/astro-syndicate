@@ -66,12 +66,29 @@ Two things that step relies on:
 
 `syndicationOptions.enabled` gates the whole run - the current config sets it to `process.env.NODE_ENV === 'production'`, so a local `astro build`, a PR preview, or plain CI never syndicates anything. Match the check to your host (Netlify: `CONTEXT`, Vercel: `VERCEL_ENV`, ...) rather than assuming `NODE_ENV`.
 
+### Pacing a large backlog
+
+Flipping `syndicate` on for dozens of existing posts at once means the next run would otherwise create dozens of drafts on the same platform in one shot. `maxSyncsPerRun` caps how many posts actually get created or updated per provider in a single run - unlimited by default:
+
+```ts
+export const syndicationOptions: SyndicationOptions = {
+  // ...
+  maxSyncsPerRun: 3,                      // every provider
+  maxSyncsPerRun: { devto: 3 },           // just this one, others stay unlimited
+};
+```
+
+A post that doesn't fit under the cap is left completely untouched, not skipped for good - it's picked up on a later run instead. A post already in sync never touches the network at all, so it costs nothing against the cap either way; only genuine new work counts.
+
+Order matters once there's a cap, so posts are processed oldest-first by frontmatter `date` (override the field name with `dateField`), falling back to file path when a post has no date at all. That's what keeps a multi-part series going out - and landing in its dev.to `series` - in the right sequence across however many capped runs it takes to drain the backlog, rather than in whatever order the filesystem lists files.
+
 ### Frontmatter fields it reads
 
 | Field | Required | Notes |
 | --- | --- | --- |
 | `syndicate` | yes | Per-provider: `{ devto: true, medium: false }`. A provider missing from the object defaults to `false` - opting in is always explicit. `syndicate: true` still works, as shorthand for "every configured provider". No provider opted in = the file is skipped entirely. |
 | `title` | yes | |
+| `date` | no | Orders posts oldest-first before processing - see "Pacing a large backlog". Falls back to file path when missing. |
 | `slug` | no | Defaults to the file name. |
 | `canonicalUrl` | no | Defaults to `${siteUrl}/blog/${slug}/`. |
 | `coverImage` | no | Local path or absolute URL; sent as dev.to's `main_image`. |

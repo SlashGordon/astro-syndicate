@@ -94,6 +94,30 @@ export interface SyndicationOptions {
    * to its canonical URL.
    */
   backlink?: BacklinkOption;
+  /**
+   * Frontmatter field posts are ordered by before processing, oldest first.
+   * A post whose value in this field is missing or unparsable sorts after
+   * every post that has one, then by file path. Defaults to `date`.
+   *
+   * Matters most together with `maxSyncsPerRun`: capped runs drain a
+   * backlog in this order, so a multi-part series goes out (and lands in
+   * its dev.to `series` in) the right sequence across however many runs
+   * that takes, rather than in whatever order the filesystem lists files.
+   */
+  dateField?: string;
+  /**
+   * Caps how many posts actually get created or updated per provider in a
+   * single run. A post left unchanged since the last sync doesn't call the
+   * provider at all, so it never counts against this - only genuine new
+   * work does. Defaults to unlimited.
+   *
+   * A single number applies to every provider; `{ <providerName>: number }`
+   * sets it per provider instead (some platforms warrant a slower rollout
+   * than others). A post that doesn't fit under the cap this run is left
+   * completely untouched, not skipped for good - it's picked up on a later
+   * run instead, in the order `dateField` puts it in.
+   */
+  maxSyncsPerRun?: number | Record<string, number>;
 }
 
 export interface RunSyndicationOptions extends SyndicationOptions {
@@ -106,6 +130,42 @@ export interface RunSyndicationOptions extends SyndicationOptions {
 export interface RunSyndicationResult {
   /** Total number of real network calls made (uploads + provider syncs). */
   totalCalls: number;
+}
+
+/** A frontmatter date value as a timestamp, or `undefined` when missing/unparsable. */
+function parseDate(data: Record<string, unknown>, field: string): number | undefined {
+  const value = data[field];
+  // gray-matter/js-yaml parses a plain `date: 2026-02-24` into a real Date
+  // already; a string or number is accepted too, for anything unusual enough
+  // to bypass that (a custom loader, a quoted value, ...).
+  const time =
+    value instanceof Date
+      ? value.getTime()
+      : typeof value === 'string' || typeof value === 'number'
+        ? new Date(value).getTime()
+        : NaN;
+  return Number.isNaN(time) ? undefined : time;
+}
+
+/** Oldest-dated first; a post with no usable date sorts after every one that has one, then by file path. */
+function compareByDate(
+  a: { filePath: string; data: Record<string, unknown> },
+  b: { filePath: string; data: Record<string, unknown> },
+  dateField: string,
+): number {
+  const dateA = parseDate(a.data, dateField);
+  const dateB = parseDate(b.data, dateField);
+
+  if (dateA !== undefined && dateB !== undefined && dateA !== dateB) return dateA - dateB;
+  if (dateA !== undefined && dateB === undefined) return -1;
+  if (dateA === undefined && dateB !== undefined) return 1;
+  return a.filePath < b.filePath ? -1 : a.filePath > b.filePath ? 1 : 0;
+}
+
+/** `undefined` (unlimited) unless `option` sets a cap for this specific provider. */
+function resolveMaxSyncs(option: number | Record<string, number> | undefined, providerName: string): number | undefined {
+  if (option === undefined) return undefined;
+  return typeof option === 'number' ? option : option[providerName];
 }
 
 /**
@@ -132,6 +192,8 @@ export async function runSyndication(options: RunSyndicationOptions): Promise<Ru
     resolveFolderImages,
     backlink,
     getCanonicalUrl,
+    dateField = 'date',
+    maxSyncsPerRun,
     logger = console,
   } = options;
 
@@ -161,12 +223,25 @@ export async function runSyndication(options: RunSyndicationOptions): Promise<Ru
   }
   logger.info(`scanning ${files.length} file(s) under ${contentDir}`);
 
-  let totalCalls = 0;
+  // Read every file up front so they can be ordered by `dateField` before
+  // any processing starts - matters once `maxSyncsPerRun` is set, so a
+  // capped run always works through the oldest not-yet-synced posts first.
+  // `matter()` is called again per file below; gray-matter caches by the
+  // exact raw string, so that second call is a cache hit, not a re-parse.
+  const entries = await Promise.all(
+    files.map(async (filePath) => {
+      const raw = await readFile(filePath, 'utf8');
+      return { filePath, raw, data: matter(raw).data as Record<string, unknown> };
+    }),
+  );
+  entries.sort((a, b) => compareByDate(a, b, dateField));
 
-  for (const filePath of files) {
+  let totalCalls = 0;
+  const syncCounts = new Map<string, number>();
+
+  for (const { filePath, raw } of entries) {
     const rel = relative(projectRoot, filePath);
 
-    const raw = await readFile(filePath, 'utf8');
     const parsed = matter(raw);
     // Copy, never mutate `parsed.data` directly: gray-matter caches parse
     // results globally, keyed by the exact raw input string, whenever
@@ -314,6 +389,15 @@ export async function runSyndication(options: RunSyndicationOptions): Promise<Ru
       // 5. Run only the providers this post opted into.
 
       for (const provider of targets) {
+        // A post left completely untouched, still oldest-first in line for
+        // whichever future run has room - not skipped for good.
+        const max = resolveMaxSyncs(maxSyncsPerRun, provider.name);
+        const count = syncCounts.get(provider.name) ?? 0;
+        if (max !== undefined && count >= max) {
+          logger.info(`${rel} -> ${provider.name}: deferred - max ${max} sync(s) per run already reached`);
+          continue;
+        }
+
         const ctx: SyncContext = { post, deployments, contentHash, isModified };
 
         let result;
@@ -330,7 +414,8 @@ export async function runSyndication(options: RunSyndicationOptions): Promise<Ru
           continue;
         }
 
-        // A real request happened: persist state, then throttle.
+        // A real request happened: count it against the cap, persist state, then throttle.
+        syncCounts.set(provider.name, count + 1);
         if (result.remoteId !== undefined) {
           deployments[provider.name] = result.remoteId;
           frontmatterDirty = true;

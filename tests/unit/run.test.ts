@@ -21,6 +21,11 @@ class FakeProvider implements SyndicationProvider {
 
   async sync(ctx: SyncContext): Promise<SyncResult> {
     this.syncCalls.push(ctx);
+    // Mirrors DevToProvider's own decision table so tests can exercise a
+    // real skip-when-unmodified path, not just "always creates".
+    if (typeof ctx.deployments[this.name] === 'number' && !ctx.isModified) {
+      return { provider: this.name, action: 'skipped', message: 'unmodified' };
+    }
     return { provider: this.name, action: 'created', remoteId: 1, message: 'created' };
   }
 }
@@ -120,6 +125,161 @@ describe('runSyndication (standalone, no Astro involved)', () => {
 
     expect(devto.syncCalls).toHaveLength(1);
     expect(medium.syncCalls).toHaveLength(1);
+  });
+
+  it('processes posts oldest-first by the date field, regardless of file name order', async () => {
+    // File names sort the opposite of the intended date order, on purpose.
+    await writeFile(
+      join(dir, 'blog', 'a-newest.md'),
+      matter.stringify('Body.\n', { title: 'Newest', syndicate: true, date: '2026-03-01' }),
+    );
+    await writeFile(
+      join(dir, 'blog', 'b-oldest.md'),
+      matter.stringify('Body.\n', { title: 'Oldest', syndicate: true, date: '2026-01-01' }),
+    );
+    await writeFile(
+      join(dir, 'blog', 'c-middle.md'),
+      matter.stringify('Body.\n', { title: 'Middle', syndicate: true, date: '2026-02-01' }),
+    );
+
+    const provider = new FakeProvider();
+    await runSyndication({
+      providers: [provider],
+      projectRoot: dir,
+      contentDir: 'blog',
+      siteUrl: 'https://example.com',
+      requestDelayMs: 0,
+      logger: fakeLogger(),
+    });
+
+    expect(provider.syncCalls.map((ctx) => ctx.post.title)).toEqual(['Oldest', 'Middle', 'Newest']);
+  });
+
+  it('sorts a post with no usable date after every dated post, then by file path', async () => {
+    await writeFile(
+      join(dir, 'blog', 'a-no-date.md'),
+      matter.stringify('Body.\n', { title: 'No Date', syndicate: true }),
+    );
+    await writeFile(
+      join(dir, 'blog', 'z-dated.md'),
+      matter.stringify('Body.\n', { title: 'Dated', syndicate: true, date: '2026-06-01' }),
+    );
+
+    const provider = new FakeProvider();
+    await runSyndication({
+      providers: [provider],
+      projectRoot: dir,
+      contentDir: 'blog',
+      siteUrl: 'https://example.com',
+      requestDelayMs: 0,
+      logger: fakeLogger(),
+    });
+
+    // "z-dated.md" sorts after "a-no-date.md" by file name, but its date
+    // still puts it first - only a post with no date at all falls back to
+    // file-path order.
+    expect(provider.syncCalls.map((ctx) => ctx.post.title)).toEqual(['Dated', 'No Date']);
+  });
+
+  it('maxSyncsPerRun caps real syncs per provider, leaving the rest untouched for a later run', async () => {
+    for (const [name, date] of [['first', '2026-01-01'], ['second', '2026-01-02'], ['third', '2026-01-03']] as const) {
+      await writeFile(
+        join(dir, 'blog', `${name}.md`),
+        matter.stringify('Body.\n', { title: name, syndicate: true, date }),
+      );
+    }
+
+    const provider = new FakeProvider();
+    const result = await runSyndication({
+      providers: [provider],
+      projectRoot: dir,
+      contentDir: 'blog',
+      siteUrl: 'https://example.com',
+      requestDelayMs: 0,
+      maxSyncsPerRun: 1,
+      logger: fakeLogger(),
+    });
+
+    expect(provider.syncCalls.map((ctx) => ctx.post.title)).toEqual(['first']);
+    expect(result.totalCalls).toBe(1);
+
+    // "second" and "third" were never touched, not skipped-and-marked-done -
+    // no `deployments` block means they're still first in line next run.
+    const second = matter(await readFile(join(dir, 'blog', 'second.md'), 'utf8'));
+    const third = matter(await readFile(join(dir, 'blog', 'third.md'), 'utf8'));
+    expect(second.data.deployments).toBeUndefined();
+    expect(third.data.deployments).toBeUndefined();
+  });
+
+  it('maxSyncsPerRun applies independently per provider when given as a map', async () => {
+    await writeFile(
+      join(dir, 'blog', 'first.md'),
+      matter.stringify('Body.\n', { title: 'First', syndicate: true, date: '2026-01-01' }),
+    );
+    await writeFile(
+      join(dir, 'blog', 'second.md'),
+      matter.stringify('Body.\n', { title: 'Second', syndicate: true, date: '2026-01-02' }),
+    );
+
+    const devto = new FakeProvider('devto');
+    const medium = new FakeProvider('medium');
+
+    await runSyndication({
+      providers: [devto, medium],
+      projectRoot: dir,
+      contentDir: 'blog',
+      siteUrl: 'https://example.com',
+      requestDelayMs: 0,
+      maxSyncsPerRun: { devto: 1 },
+      logger: fakeLogger(),
+    });
+
+    expect(devto.syncCalls).toHaveLength(1);
+    expect(medium.syncCalls).toHaveLength(2);
+  });
+
+  it('an unmodified (skipped) post does not count against the cap', async () => {
+    await writeFile(
+      join(dir, 'blog', 'first.md'),
+      matter.stringify('Body.\n', { title: 'First', syndicate: true, date: '2026-01-01' }),
+    );
+
+    // First run: syncs and persists real deployment state for "first".
+    await runSyndication({
+      providers: [new FakeProvider()],
+      projectRoot: dir,
+      contentDir: 'blog',
+      siteUrl: 'https://example.com',
+      requestDelayMs: 0,
+      logger: fakeLogger(),
+    });
+
+    // Second post added afterwards, dated later.
+    await writeFile(
+      join(dir, 'blog', 'second.md'),
+      matter.stringify('Body.\n', { title: 'Second', syndicate: true, date: '2026-01-02' }),
+    );
+
+    const provider = new FakeProvider();
+    const result = await runSyndication({
+      providers: [provider],
+      projectRoot: dir,
+      contentDir: 'blog',
+      siteUrl: 'https://example.com',
+      requestDelayMs: 0,
+      maxSyncsPerRun: 1,
+      logger: fakeLogger(),
+    });
+
+    // Both are attempted in date order ("first" is processed first, and
+    // correctly comes back "skipped" since it's unmodified) - but only a
+    // genuine create/update counts against the cap, so a cap of 1 still
+    // lets "second" (truly new) go out in the same run.
+    expect(provider.syncCalls.map((ctx) => ctx.post.title)).toEqual(['First', 'Second']);
+    expect(result.totalCalls).toBe(1);
+
+    const second = matter(await readFile(join(dir, 'blog', 'second.md'), 'utf8'));
+    expect(second.data.deployments.fake).toBe(1);
   });
 
   it('defaults to `console` when no logger is given', async () => {
