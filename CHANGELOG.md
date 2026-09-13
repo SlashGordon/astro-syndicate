@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/SlashGordon/astro-syndicate/compare/v0.5.0...v0.6.0) (2026-09-13)
+
+
+### Features
+
+* cap syncs per run and process posts oldest-first ([d85ffa6](https://github.com/SlashGordon/astro-syndicate/commit/d85ffa6ce5dddd5a49cceac25e0a26de1caa7fd3))
+
 ## [0.5.0](https://github.com/SlashGordon/astro-syndicate/compare/v0.4.1...v0.5.0) (2026-09-12)
 
 
