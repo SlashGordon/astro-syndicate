@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/SlashGordon/astro-syndicate/compare/v0.6.0...v0.7.0) (2026-09-14)
+
+
+### Features
+
+* added overwrite for titles ([1550a70](https://github.com/SlashGordon/astro-syndicate/commit/1550a704f04b0e7e63faae201bc79a7f7fd4e904))
+
 ## [0.6.0](https://github.com/SlashGordon/astro-syndicate/compare/v0.5.0...v0.6.0) (2026-09-13)
 
 
