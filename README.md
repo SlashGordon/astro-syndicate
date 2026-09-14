@@ -86,7 +86,7 @@ Order matters once there's a cap, so posts are processed oldest-first by frontma
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| `syndicate` | yes | Per-provider: `{ devto: true, medium: false }`. A provider missing from the object defaults to `false` - opting in is always explicit. `syndicate: true` still works, as shorthand for "every configured provider". No provider opted in = the file is skipped entirely. |
+| `syndicate` | yes | Per-provider: `{ devto: true, medium: false }`. A provider missing from the object defaults to `false` - opting in is always explicit. `syndicate: true` still works, as shorthand for "every configured provider". No provider opted in = the file is skipped entirely. An entry can also be an object - `{ devto: { enable: true, title: ..., series: ... } }` - to override `title`/`series` for just that provider; `enable: true` is required to opt in this way, and an override left out falls back to the post's own field. |
 | `title` | yes | |
 | `date` | no | Orders posts oldest-first before processing - see "Pacing a large backlog". Falls back to file path when missing. |
 | `slug` | no | Defaults to the file name. |

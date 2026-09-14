@@ -130,6 +130,24 @@ export interface Deployments {
   [providerName: string]: string | number | Record<string, string> | undefined;
 }
 
+/**
+ * Per-post, per-provider overrides, from the object form of frontmatter
+ * `syndicate.<provider>` (see `resolveSyndicateTargets`). Layered onto the
+ * post's own fields before that specific provider syncs it - a field left
+ * out here falls back to the post's own value, unchanged for every other
+ * provider.
+ */
+export interface SyndicateOverrides {
+  title?: string;
+  series?: string;
+}
+
+/** One provider a post opts into, with whatever per-provider overrides it set. */
+export interface SyndicateTarget {
+  provider: SyndicationProvider;
+  overrides: SyndicateOverrides;
+}
+
 export type SyncAction = 'created' | 'updated' | 'skipped';
 
 /** Outcome of syncing one post to one provider. */

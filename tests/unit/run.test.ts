@@ -105,6 +105,77 @@ describe('runSyndication (standalone, no Astro involved)', () => {
     expect(medium.syncCalls.map((ctx) => ctx.post.title)).toEqual(['Medium Only']);
   });
 
+  it('applies a per-provider title/series override from the object form of `syndicate`', async () => {
+    await writeFile(
+      join(dir, 'blog', 'post.md'),
+      matter.stringify('Body.\n', {
+        title: 'Original Title',
+        series: 'Original Series',
+        syndicate: { devto: { enable: true, title: 'Devto Title', series: 'The 35-Watt Roommate' } },
+      }),
+    );
+
+    const devto = new FakeProvider('devto');
+    await runSyndication({
+      providers: [devto],
+      projectRoot: dir,
+      contentDir: 'blog',
+      siteUrl: 'https://example.com',
+      requestDelayMs: 0,
+      logger: fakeLogger(),
+    });
+
+    expect(devto.syncCalls).toHaveLength(1);
+    expect(devto.syncCalls[0].post.title).toBe('Devto Title');
+    expect(devto.syncCalls[0].post.series).toBe('The 35-Watt Roommate');
+  });
+
+  it('falls back to the post\'s own title/series when the object form omits them', async () => {
+    await writeFile(
+      join(dir, 'blog', 'post.md'),
+      matter.stringify('Body.\n', {
+        title: 'Original Title',
+        series: 'Original Series',
+        syndicate: { devto: { enable: true } },
+      }),
+    );
+
+    const devto = new FakeProvider('devto');
+    await runSyndication({
+      providers: [devto],
+      projectRoot: dir,
+      contentDir: 'blog',
+      siteUrl: 'https://example.com',
+      requestDelayMs: 0,
+      logger: fakeLogger(),
+    });
+
+    expect(devto.syncCalls[0].post.title).toBe('Original Title');
+    expect(devto.syncCalls[0].post.series).toBe('Original Series');
+  });
+
+  it('does not opt in via the object form unless `enable: true` is set', async () => {
+    await writeFile(
+      join(dir, 'blog', 'post.md'),
+      matter.stringify('Body.\n', {
+        title: 'Post',
+        syndicate: { devto: { title: 'Devto Title' } },
+      }),
+    );
+
+    const devto = new FakeProvider('devto');
+    await runSyndication({
+      providers: [devto],
+      projectRoot: dir,
+      contentDir: 'blog',
+      siteUrl: 'https://example.com',
+      requestDelayMs: 0,
+      logger: fakeLogger(),
+    });
+
+    expect(devto.syncCalls).toHaveLength(0);
+  });
+
   it('still opts into every configured provider for the legacy `syndicate: true` form', async () => {
     await writeFile(
       join(dir, 'blog', 'post.md'),

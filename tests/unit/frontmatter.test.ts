@@ -61,16 +61,21 @@ describe('resolveSyndicateTargets', () => {
   const medium = makeProvider('medium');
   const providers = [devto, medium];
 
-  it('opts into every configured provider for the legacy `syndicate: true` form', () => {
-    expect(resolveSyndicateTargets(true, providers)).toEqual([devto, medium]);
+  it('opts into every configured provider, with no overrides, for the legacy `syndicate: true` form', () => {
+    expect(resolveSyndicateTargets(true, providers)).toEqual([
+      { provider: devto, overrides: {} },
+      { provider: medium, overrides: {} },
+    ]);
   });
 
   it('opts into only the providers explicitly set to true', () => {
-    expect(resolveSyndicateTargets({ devto: true, medium: false }, providers)).toEqual([devto]);
+    expect(resolveSyndicateTargets({ devto: true, medium: false }, providers)).toEqual([
+      { provider: devto, overrides: {} },
+    ]);
   });
 
   it('opts into nothing for a provider missing from the object', () => {
-    expect(resolveSyndicateTargets({ devto: true }, providers)).toEqual([devto]);
+    expect(resolveSyndicateTargets({ devto: true }, providers)).toEqual([{ provider: devto, overrides: {} }]);
     expect(resolveSyndicateTargets({}, providers)).toEqual([]);
   });
 
@@ -89,5 +94,22 @@ describe('resolveSyndicateTargets', () => {
   it('returns an empty array when no providers are configured at all', () => {
     expect(resolveSyndicateTargets(true, [])).toEqual([]);
     expect(resolveSyndicateTargets({ devto: true }, [])).toEqual([]);
+  });
+
+  it('opts in with overrides via the object form when `enable: true`', () => {
+    expect(
+      resolveSyndicateTargets({ devto: { enable: true, title: 'Devto Title', series: 'A Series' } }, providers),
+    ).toEqual([{ provider: devto, overrides: { title: 'Devto Title', series: 'A Series' } }]);
+  });
+
+  it('opts into nothing for the object form without `enable: true`', () => {
+    expect(resolveSyndicateTargets({ devto: { title: 'Devto Title' } }, providers)).toEqual([]);
+    expect(resolveSyndicateTargets({ devto: { enable: false, title: 'Devto Title' } }, providers)).toEqual([]);
+  });
+
+  it('leaves an override unset when the object form omits it, instead of an empty string', () => {
+    expect(resolveSyndicateTargets({ devto: { enable: true } }, providers)).toEqual([
+      { provider: devto, overrides: { title: undefined, series: undefined } },
+    ]);
   });
 });

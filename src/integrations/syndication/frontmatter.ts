@@ -5,34 +5,68 @@
  * the provider that owns the limit.
  */
 
-import type { SyndicationProvider } from './types.js';
+import type { SyndicateTarget, SyndicationProvider } from './types.js';
 
 /**
- * Resolve which of the configured providers a post opts into.
+ * Resolve which of the configured providers a post opts into, and any
+ * per-provider overrides that come with it.
  *
- * `syndicate` is per-provider, keyed by `SyndicationProvider.name`:
+ * `syndicate` is per-provider, keyed by `SyndicationProvider.name`. Each
+ * entry is either `true` (opt in, use the post's own fields as-is) or an
+ * object with `enable: true` plus whatever overrides that provider needs:
  *
  *   syndicate:
- *     devto: true
+ *     devto:
+ *       enable: true
+ *       title: A dev.to-specific title
+ *       series: The 35-Watt Roommate
  *     medium: false
  *
  * A post that suits dev.to but not Medium (or vice versa) needs to say so -
  * a single blanket flag can't express that. A provider missing from the
- * object defaults to `false`: opting in is always explicit, never implied by
- * omission. `syndicate: true` still works too, as shorthand for "every
- * configured provider" - the whole frontmatter contract before this existed,
- * and still the simplest form while there's only one provider in play.
- * Anything else (`false`, missing, a string, `null`, ...) opts into nothing.
+ * object, set to `false`, or an object without `enable: true` all opt into
+ * nothing: opting in is always explicit, never implied by omission. An
+ * override left out of the object (or the whole entry being plain `true`)
+ * falls back to the post's own field - `title`, most commonly, since a
+ * per-provider title is usually the exception, not the rule.
+ *
+ * `syndicate: true` still works too, as shorthand for "every configured
+ * provider, no overrides" - the whole frontmatter contract before per-provider
+ * opt-in existed, and still the simplest form while only one provider is in
+ * play. Anything else (`false`, missing, a string, `null`, ...) opts into
+ * nothing.
  */
 export function resolveSyndicateTargets(
   value: unknown,
   providers: readonly SyndicationProvider[],
-): SyndicationProvider[] {
-  if (value === true) return [...providers];
+): SyndicateTarget[] {
+  if (value === true) return providers.map((provider) => ({ provider, overrides: {} }));
   if (!value || typeof value !== 'object') return [];
 
   const flags = value as Record<string, unknown>;
-  return providers.filter((provider) => flags[provider.name] === true);
+  const targets: SyndicateTarget[] = [];
+
+  for (const provider of providers) {
+    const entry = flags[provider.name];
+
+    if (entry === true) {
+      targets.push({ provider, overrides: {} });
+      continue;
+    }
+
+    if (entry && typeof entry === 'object' && (entry as Record<string, unknown>).enable === true) {
+      const obj = entry as Record<string, unknown>;
+      targets.push({
+        provider,
+        overrides: {
+          title: normalizeText(obj.title),
+          series: normalizeText(obj.series),
+        },
+      });
+    }
+  }
+
+  return targets;
 }
 
 /**

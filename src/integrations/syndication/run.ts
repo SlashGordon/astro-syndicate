@@ -370,7 +370,7 @@ export async function runSyndication(options: RunSyndicationOptions): Promise<Ru
       const contentHash = generateContentHash(title, body, assetFingerprints);
       const isModified = contentHash !== deployments.contentHash;
 
-      const post: BlogPost = {
+      const basePost: BlogPost = {
         filePath,
         slug,
         title,
@@ -388,7 +388,7 @@ export async function runSyndication(options: RunSyndicationOptions): Promise<Ru
 
       // 5. Run only the providers this post opted into.
 
-      for (const provider of targets) {
+      for (const { provider, overrides } of targets) {
         // A post left completely untouched, still oldest-first in line for
         // whichever future run has room - not skipped for good.
         const max = resolveMaxSyncs(maxSyncsPerRun, provider.name);
@@ -397,6 +397,15 @@ export async function runSyndication(options: RunSyndicationOptions): Promise<Ru
           logger.info(`${rel} -> ${provider.name}: deferred - max ${max} sync(s) per run already reached`);
           continue;
         }
+
+        // Per-provider overrides (frontmatter `syndicate.<provider>.title`/
+        // `.series`) layer onto the post's own fields; an override left
+        // unset falls back to what every other provider sees.
+        const post: BlogPost = {
+          ...basePost,
+          title: overrides.title ?? basePost.title,
+          series: overrides.series ?? basePost.series,
+        };
 
         const ctx: SyncContext = { post, deployments, contentHash, isModified };
 
