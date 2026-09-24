@@ -204,4 +204,4 @@ MIT © [SlashGordon](https://www.slashgordon.link).
 If this integration saves you time, consider buying me a coffee. It helps keep
 the maintenance going.
 
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-SlashGordon-FFDD00?logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/SlashGordon)
+<a href="https://buymeacoffee.com/SlashGordon"><img src=".github/assets/buymeacoffee-badge.svg" alt="Buy Me A Coffee" width="180"></a>
