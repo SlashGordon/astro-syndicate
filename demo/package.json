@@ -13,10 +13,10 @@
     "syndicate": "tsx scripts/syndicate.ts"
   },
   "dependencies": {
-    "astro": "^7.3.2",
+    "astro": "^7.4.12",
     "astro-syndicate": "file:.."
   },
   "devDependencies": {
-    "tsx": "^4.23.13"
+    "tsx": "^4.23.15"
   }
 }
