@@ -24,12 +24,12 @@ You need two things:
 
   An unsigned preset lets anyone who knows its name upload to your account, rate-limited by your plan. Fine for this demo; don't reuse the name anywhere public-facing later.
 
-This demo depends on `astro-syndicate` via `file:..`, so it needs the package built first, then its own install (only needed once, or whenever the package's dependencies change):
+This demo depends on `astro-syndicate` via `link:..`, so it needs the package built first, then its own install (only needed once, or whenever the package's dependencies change):
 
 ```bash
 # from the repo root
-npm run build:lib
-npm install --prefix demo
+pnpm run build:lib
+pnpm --dir demo install
 ```
 
 ```bash
@@ -37,7 +37,7 @@ npm install --prefix demo
 DEVTO_API_KEY=your_key_here \
 CLOUDINARY_CLOUD_NAME=your_cloud_name \
 CLOUDINARY_UPLOAD_PRESET=your_preset_name \
-npm run demo:build
+pnpm run demo:build
 ```
 
 Without `DEVTO_API_KEY` set, the build still succeeds - it just skips syndication entirely (that's what lets CI build this demo on every push without needing real credentials).
@@ -57,7 +57,7 @@ draft.
 To start over:
 
 ```bash
-npm run demo:reset            # preview with: npm run demo:reset -- --dry-run
+pnpm run demo:reset            # preview with: pnpm run demo:reset --dry-run
 ```
 
 This clears the `deployments:` block from every post under `demo/src/content/blog/`,
@@ -94,7 +94,7 @@ trigger it":
 - **`cloudflare-pages.yml`** - build with *no* `DEVTO_API_KEY` set (so
   `syndication.config.ts`'s `enabled` gate keeps the build to static pages
   only), deploy that output to Cloudflare Pages, then run
-  `npm run syndicate --prefix demo` (`scripts/syndicate.ts`) as its own step
+  `pnpm --dir demo run syndicate` (`scripts/syndicate.ts`) as its own step
   *after* the deploy succeeds - so dev.to only ever sees canonical URLs and
   cover images that are already live. Cloudflare Pages is just the example
   host here; swap that one deploy step for whatever you use and keep the
@@ -122,9 +122,9 @@ confident enough to let new posts go live on dev.to the moment they're
 created; it never touches an already-published post on a later update (see
 the CRITICAL note on `DevToProvider` for why that field is create-only).
 
-Both files build `astro-syndicate` from source first (`npm run build:lib`)
-since this demo depends on it via `file:..` in the same repo - drop that
-step in your own project, where `npm ci` already installs a published
+Both files build `astro-syndicate` from source first (`pnpm run build:lib`)
+since this demo depends on it via `link:..` in the same repo - drop that
+step in your own project, where `pnpm install --frozen-lockfile` already installs a published
 version straight from npm.
 
 ## Rate limits

@@ -33,22 +33,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      # `file:..`-only, see deploy.yml. Skip in a real project.
-      - run: npm ci
-      - run: npm run build:lib
+      # `link:..`-only, see deploy.yml. Skip in a real project.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build:lib
 
-      - run: npm install --prefix demo --no-audit --no-fund
+      - run: pnpm --dir demo install --frozen-lockfile
 
       # No DEVTO_API_KEY here on purpose - see the GitHub Actions version's
       # comment on the equivalent step.
-      - run: npm run build --prefix demo
+      - run: pnpm --dir demo run build
 
       - name: Deploy to Cloudflare Pages
-        run: npx wrangler pages deploy demo/dist --project-name=astro-syndicate-demo
+        run: pnpm dlx wrangler pages deploy demo/dist --project-name=astro-syndicate-demo
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -56,7 +59,7 @@ jobs:
         # log - that's the deploy "visualized" without parsing its output.
 
       - name: Syndicate to dev.to
-        run: npm run syndicate --prefix demo
+        run: pnpm --dir demo run syndicate
         env:
           DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
           # No Cloudinary secrets here - see the GitHub Actions version's

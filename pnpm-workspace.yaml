@@ -1,0 +1,7 @@
+# pnpm settings of this package. node_modules stays flat like npm's.
+nodeLinker: hoisted
+# Install scripts stay off, as under npm with ignore-scripts: esbuild and sharp find their binaries in their
+# optional dependencies.
+allowBuilds:
+  esbuild: false
+  sharp: false

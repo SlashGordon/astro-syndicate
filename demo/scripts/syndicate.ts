@@ -17,7 +17,7 @@
  * already served at `SITE_URL` - so `SiteUrlUploader` just rewrites image
  * paths to that, no upload step (or Cloudinary account) needed at all.
  *
- * Usage: npm run syndicate --prefix demo
+ * Usage: pnpm --dir demo run syndicate
  */
 import { fileURLToPath } from 'node:url';
 

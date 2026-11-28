@@ -31,7 +31,7 @@ Every new post syncs as a draft on dev.to (`published: false`) by default - noth
 ### Two ways to trigger it
 
 - **During the build** (the default here): `astro.config.mjs` registers `syndication(syndicationOptions)`, which runs in the `astro:build:done` hook. Simplest option, and the right one when your build already happens at/after deploy - there's no real gap between "built" and "live".
-- **After deploy, as its own step**: call `runSyndication()` directly - a plain async function, no Astro involved - from anywhere, e.g. `npm run syndicate` (`scripts/syndicate.ts`), wired into CI to run *after* your host confirms the deploy succeeded. Pick this when there IS a gap between build and deploy (a separate upload step, CDN propagation, a review stage), so dev.to only ever sees image and canonical URLs that are already live, not a build's worth of assets that haven't gone anywhere yet.
+- **After deploy, as its own step**: call `runSyndication()` directly - a plain async function, no Astro involved - from anywhere, e.g. `pnpm run syndicate` (`scripts/syndicate.ts`), wired into CI to run *after* your host confirms the deploy succeeded. Pick this when there IS a gap between build and deploy (a separate upload step, CDN propagation, a review stage), so dev.to only ever sees image and canonical URLs that are already live, not a build's worth of assets that haven't gone anywhere yet.
 
 Both read the exact same `syndicationOptions` from `syndication.config.ts`, so there's one place to configure either way. Running both isn't harmful (the content-hash skip makes a redundant pass a no-op) - just redundant.
 
@@ -170,7 +170,7 @@ new DistHtmlUploader({
 `resetContentDir(contentDir)` / `clearDeployments(filePath)` (from `src/integrations/syndication/reset.ts`, exported from the package) strip the `deployments` block back out of a post's frontmatter, restoring it to its pre-sync state. `scripts/reset-content.ts` is a small CLI wrapper around it:
 
 ```bash
-npm run reset-content -- src/content/blog        # preview with: ... -- src/content/blog --dry-run
+pnpm run reset-content src/content/blog        # preview with: ... src/content/blog --dry-run
 ```
 
 This can't delete anything on dev.to - the API has no endpoint for that, only the web dashboard does - but it prints every dev.to id it finds so you know exactly what to remove there.
@@ -178,17 +178,17 @@ This can't delete anything on dev.to - the API has no endpoint for that, only th
 ## Development
 
 ```bash
-npm install
-npm run dev      # astro dev
-npm run build    # astro build - this is what triggers syndication
+pnpm install
+pnpm run dev      # astro dev
+pnpm run build    # astro build - this is what triggers syndication
 ```
 
 ## Testing
 
 ```bash
-npm test                  # everything
-npm run test:unit         # hashing, the image parser, providers, uploaders, canonical-URL logic
-npm run test:integration  # a real `astro build` against fixture posts, network mocked
+pnpm test                  # everything
+pnpm run test:unit         # hashing, the image parser, providers, uploaders, canonical-URL logic
+pnpm run test:integration  # a real `astro build` against fixture posts, network mocked
 ```
 
 The unit tests in `tests/unit/` cover the logic most likely to hide a bug: SHA-256 hashing (including how image fingerprints fold in), the regex-based image scanner (code-fence and inline-code exclusion, the `data-src` vs. `src` distinction), frontmatter normalization (tags, series, description), the backlink footer, the dev.to create/update/skip decision table, the 4-tag cap, the canonical-URL precedence rules, both asset uploaders, and `runSyndication()` called standalone (no Astro at all) - including the `enabled` gate and a regression test for a real bug: `gray-matter` caches parses globally by raw input string, so mutating its returned `data` in place had corrupted that cache for any other byte-identical file. Another regression test covers an update never sending `published: false`, since dev.to's API reverts an already-published post to draft when it sees that.

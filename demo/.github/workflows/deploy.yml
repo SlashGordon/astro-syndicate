@@ -1,12 +1,12 @@
 # Sample deploy pipeline for a real Astro site using astro-syndicate.
 #
-# This demo depends on the package via `file:..` (it lives in the same repo
+# This demo depends on the package via `link:..` (it lives in the same repo
 # as the package source), which is why it builds the library first. A real
 # project installing `astro-syndicate` from npm would skip straight to
-# `npm ci` against its own package.json - no `build:lib` step needed.
+# `pnpm install --frozen-lockfile` against its own package.json - no `build:lib` step needed.
 #
 # Copy this into your own project's `.github/workflows/`, drop the two
-# `file:..`-only steps, and point the build step at your own site.
+# `link:..`-only steps, and point the build step at your own site.
 #
 # `astro build` here also runs syndication (via the `syndication()`
 # integration in astro.config.mjs), which rewrites synced posts' frontmatter
@@ -31,19 +31,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: 'pnpm'
 
-      # `file:..`-only: builds the astro-syndicate package this demo consumes.
-      # Skip these two steps in a real project - `npm ci` there already
+      # `link:..`-only: builds the astro-syndicate package this demo consumes.
+      # Skip these two steps in a real project - `pnpm install --frozen-lockfile` there already
       # pulls a published `astro-syndicate` version straight from npm.
-      - run: npm ci
-      - run: npm run build:lib
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build:lib
 
-      - run: npm install --prefix demo --no-audit --no-fund
-      - run: npm run build --prefix demo
+      - run: pnpm --dir demo install --frozen-lockfile
+      - run: pnpm --dir demo run build
         env:
           DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
           CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}

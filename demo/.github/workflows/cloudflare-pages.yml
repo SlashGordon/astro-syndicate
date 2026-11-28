@@ -35,24 +35,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: 'pnpm'
 
-      # `file:..`-only: builds the astro-syndicate package this demo consumes.
-      # Skip these two steps in a real project - `npm ci` there already
+      # `link:..`-only: builds the astro-syndicate package this demo consumes.
+      # Skip these two steps in a real project - `pnpm install --frozen-lockfile` there already
       # pulls a published `astro-syndicate` version straight from npm.
-      - run: npm ci
-      - run: npm run build:lib
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build:lib
 
-      - run: npm install --prefix demo --no-audit --no-fund
+      - run: pnpm --dir demo install --frozen-lockfile
 
       # No DEVTO_API_KEY here on purpose: `syndication.config.ts`'s `enabled`
       # gate is `Boolean(process.env.DEVTO_API_KEY)`, so without it this
       # build only produces static pages - no syndication happens until the
       # dedicated step below, after Cloudflare confirms the deploy.
-      - run: npm run build --prefix demo
+      - run: pnpm --dir demo run build
 
       - name: Deploy to Cloudflare Pages
         id: deploy
@@ -67,7 +70,7 @@ jobs:
         run: echo "### 🚀 Deployed to ${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Syndicate to dev.to
-        run: npm run syndicate --prefix demo
+        run: pnpm --dir demo run syndicate
         env:
           DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
           # No Cloudinary secrets here: scripts/syndicate.ts uses
